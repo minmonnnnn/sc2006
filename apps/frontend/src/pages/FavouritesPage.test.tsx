@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AuthProvider } from '../features/auth/AuthContext'
+import { AuthProvider, useAuth } from '../features/auth/AuthContext'
 import { AUTH_STORAGE_KEY } from '../features/auth/authStorage'
 import { FavouritesPage } from './FavouritesPage'
 
@@ -31,6 +31,16 @@ function renderPage(onSelect = vi.fn(), onSearch = vi.fn()) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ userId: 'driver-1', token: 'session-token' }))
   render(<AuthProvider><FavouritesPage onSelect={onSelect} onSearch={onSearch} /></AuthProvider>)
   return { onSelect, onSearch }
+}
+
+function SwitchSession() {
+  const { login } = useAuth()
+  return <button type="button" onClick={() => void login({ email: 'driver-b@example.com', password: 'password' })}>Switch session</button>
+}
+
+function renderPageWithSessionSwitch() {
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ userId: 'driver-a', token: 'token-a' }))
+  render(<AuthProvider><SwitchSession /><FavouritesPage onSelect={vi.fn()} onSearch={vi.fn()} /></AuthProvider>)
 }
 
 afterEach(() => {
@@ -179,5 +189,49 @@ describe('FavouritesPage', () => {
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(screen.getByText('1 Main St')).toBeInTheDocument())
     expect(attempts).toBe(2)
+  })
+
+  it('keeps the newer session list when the previous GET resolves last', async () => {
+    const firstList = deferredResponse()
+    const fetchMock = vi.fn((path: string, options?: RequestInit) => {
+      if (path === '/api/auth/login') return Promise.resolve(Response.json({ userId: 'driver-b', token: 'token-b' }))
+      if (path === '/api/users/me') return Promise.resolve(Response.json(profile))
+      if (path === '/api/favourites') return options?.headers instanceof Headers && options.headers.get('Authorization') === 'Bearer token-a'
+        ? firstList.promise : Promise.resolve(Response.json([office]))
+      return Promise.resolve(new Response(null, { status: 500 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderPageWithSessionSwitch()
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => path === '/api/favourites')).toBe(true))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Switch session' }))
+    expect(await screen.findByText('2 Main St')).toBeInTheDocument()
+    firstList.resolve(Response.json([home]))
+    await act(async () => { await firstList.promise; await Promise.resolve() })
+    expect(screen.getByText('2 Main St')).toBeInTheDocument()
+    expect(screen.queryByText('1 Main St')).not.toBeInTheDocument()
+  })
+
+  it('cancels a pending Undo deletion when the token changes', async () => {
+    const fetchMock = vi.fn((path: string, options?: RequestInit) => {
+      if (path === '/api/auth/login') return Promise.resolve(Response.json({ userId: 'driver-b', token: 'token-b' }))
+      if (path === '/api/users/me') return Promise.resolve(Response.json(profile))
+      if (path === '/api/favourites') return Promise.resolve(Response.json(options?.headers instanceof Headers && options.headers.get('Authorization') === 'Bearer token-a' ? [home] : [office]))
+      return Promise.resolve(new Response(null, { status: 204 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderPageWithSessionSwitch()
+    await screen.findByText('1 Main St')
+    vi.useFakeTimers()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Home' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm deletion' }))
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch session' }))
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+    expect(screen.getByText('2 Main St')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
+    await act(async () => vi.advanceTimersByTimeAsync(5000))
+    expect(fetchMock.mock.calls.filter(([, options]) => options?.method === 'DELETE')).toHaveLength(0)
   })
 })

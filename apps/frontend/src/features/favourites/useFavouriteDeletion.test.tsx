@@ -53,4 +53,18 @@ describe('useFavouriteDeletion', () => {
     await act(async () => vi.advanceTimersByTimeAsync(5000))
     expect(remove).not.toHaveBeenCalled()
   })
+
+  it('uses the removal callback captured when deletion was scheduled', async () => {
+    const removeA = vi.fn().mockResolvedValue(undefined)
+    const removeB = vi.fn().mockResolvedValue(undefined)
+    const { result, rerender } = renderHook(({ remove }) => useFavouriteDeletion(remove), {
+      initialProps: { remove: removeA },
+    })
+    act(() => result.current.scheduleDelete(home))
+    rerender({ remove: removeB })
+    await act(async () => vi.advanceTimersByTimeAsync(5000))
+
+    expect(removeA).toHaveBeenCalledExactlyOnceWith(home.id)
+    expect(removeB).not.toHaveBeenCalled()
+  })
 })

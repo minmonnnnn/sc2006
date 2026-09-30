@@ -13,7 +13,10 @@ interface FavouritesPageProps {
 
 export function FavouritesPage({ onSelect, onSearch }: FavouritesPageProps) {
   const { session } = useAuth()
-  const token = session?.token
+  return <FavouritesSession key={session?.token ?? ''} token={session?.token} onSelect={onSelect} onSearch={onSearch} />
+}
+
+function FavouritesSession({ token, onSelect, onSearch }: FavouritesPageProps & { token: string | undefined }) {
   const [favourites, setFavourites] = useState<FavouriteLocation[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -27,9 +30,11 @@ export function FavouritesPage({ onSelect, onSearch }: FavouritesPageProps) {
   const confirmDeleteRef = useRef<HTMLButtonElement>(null)
   const undoRef = useRef<HTMLButtonElement>(null)
   const restoreFocusRef = useRef(false)
+  const requestGenerationRef = useRef(0)
   const deletion = useFavouriteDeletion((id) => token ? deleteFavourite(token, id) : Promise.reject(new Error('Sign in to manage saved locations')))
 
   const load = useCallback(async () => {
+    const generation = ++requestGenerationRef.current
     if (!token) {
       setLoading(false)
       setLoadError('Sign in to view saved locations.')
@@ -38,15 +43,20 @@ export function FavouritesPage({ onSelect, onSearch }: FavouritesPageProps) {
     setLoading(true)
     setLoadError('')
     try {
-      setFavourites(await listFavourites(token))
+      const result = await listFavourites(token)
+      if (requestGenerationRef.current === generation) setFavourites(result)
     } catch {
-      setLoadError('Could not load saved locations. Try again.')
+      if (requestGenerationRef.current === generation) setLoadError('Could not load saved locations. Try again.')
     } finally {
-      setLoading(false)
+      if (requestGenerationRef.current === generation) setLoading(false)
     }
   }, [token])
 
-  useEffect(() => { void Promise.resolve().then(load) }, [load])
+  useEffect(() => {
+    let active = true
+    void Promise.resolve().then(() => { if (active) void load() })
+    return () => { active = false; requestGenerationRef.current += 1 }
+  }, [load])
 
   useEffect(() => {
     if (confirming) cancelDeleteRef.current?.focus()

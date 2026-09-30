@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { FavouriteLocation } from '@smart-parking/shared-types'
 
 interface PendingDeletion {
@@ -7,7 +7,6 @@ interface PendingDeletion {
 }
 
 export function useFavouriteDeletion(remove: (id: number) => Promise<void>) {
-  const removeRef = useRef(remove)
   const pendingRef = useRef<PendingDeletion | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(true)
@@ -15,7 +14,7 @@ export function useFavouriteDeletion(remove: (id: number) => Promise<void>) {
   const [deletedIds, setDeletedIds] = useState<Set<number>>(() => new Set())
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
@@ -24,8 +23,6 @@ export function useFavouriteDeletion(remove: (id: number) => Promise<void>) {
       pendingRef.current = null
     }
   }, [])
-
-  useEffect(() => { removeRef.current = remove }, [remove])
 
   function scheduleDelete(favourite: FavouriteLocation): boolean {
     if (pendingRef.current) return false
@@ -40,7 +37,7 @@ export function useFavouriteDeletion(remove: (id: number) => Promise<void>) {
       pendingRef.current = deleting
       setPending(deleting)
       try {
-        await removeRef.current(favourite.id)
+        await remove(favourite.id)
         if (mountedRef.current) setDeletedIds((ids) => new Set(ids).add(favourite.id))
       } catch (cause) {
         if (mountedRef.current) setError(`Could not delete ${favourite.locationName}. ${cause instanceof Error ? cause.message : 'Try again.'}`)
