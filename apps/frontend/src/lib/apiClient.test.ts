@@ -8,7 +8,7 @@ describe('apiRequest', () => {
   })
 
   it('prefixes the API base URL and sends JSON headers and bearer token', async () => {
-    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.test')
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.test/api')
     const fetchMock = vi.fn().mockResolvedValue(new Response('{"ok":true}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -19,6 +19,20 @@ describe('apiRequest', () => {
     expect(new Headers(options.headers).get('Content-Type')).toBe('application/json')
     expect(new Headers(options.headers).get('Authorization')).toBe('Bearer session-token')
   })
+
+  it.each([null, [], { error: null }, { error: { code: 401, message: {} } }])(
+    'throws a typed client error for malformed error bodies: %j', async (body) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(body, { status: 502 })))
+
+      const request = apiRequest('/api/users/me')
+      await expect(request).rejects.toBeInstanceOf(ApiClientError)
+      await expect(request).rejects.toMatchObject({
+        status: 502,
+        code: 'INTERNAL_ERROR',
+        message: 'Request failed',
+      })
+    },
+  )
 
   it('returns undefined for 204 without parsing JSON', async () => {
     const response = new Response(null, { status: 204 })
