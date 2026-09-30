@@ -14,6 +14,7 @@ export function ProfilePage({ onAccountDeleted }: ProfilePageProps) {
   const [name, setName] = useState('')
   const [vehicleType, setVehicleType] = useState<VehicleType | ''>('')
   const [editError, setEditError] = useState('')
+  const [profileUpdated, setProfileUpdated] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -21,9 +22,15 @@ export function ProfilePage({ onAccountDeleted }: ProfilePageProps) {
   const deleteTriggerRef = useRef<HTMLButtonElement>(null)
   const cancelDeleteRef = useRef<HTMLButtonElement>(null)
   const confirmDeleteRef = useRef<HTMLButtonElement>(null)
+  const restoreDeleteFocusRef = useRef(false)
 
   useEffect(() => {
-    if (confirming) cancelDeleteRef.current?.focus()
+    if (confirming) {
+      cancelDeleteRef.current?.focus()
+    } else if (restoreDeleteFocusRef.current) {
+      restoreDeleteFocusRef.current = false
+      deleteTriggerRef.current?.focus()
+    }
   }, [confirming])
 
   function startEditing() {
@@ -31,6 +38,7 @@ export function ProfilePage({ onAccountDeleted }: ProfilePageProps) {
     setName(profile.name)
     setVehicleType(profile.vehicleType)
     setEditError('')
+    setProfileUpdated(false)
     setEditing(true)
   }
 
@@ -60,6 +68,7 @@ export function ProfilePage({ onAccountDeleted }: ProfilePageProps) {
     try {
       await updateProfile({ name: trimmedName, vehicleType })
       setEditing(false)
+      setProfileUpdated(true)
     } catch (cause) {
       setEditError(cause instanceof Error ? cause.message : 'Could not save your profile. Try again.')
     } finally {
@@ -69,9 +78,9 @@ export function ProfilePage({ onAccountDeleted }: ProfilePageProps) {
 
   function closeConfirmation() {
     if (deleting) return
+    restoreDeleteFocusRef.current = true
     setConfirming(false)
     setDeleteError('')
-    deleteTriggerRef.current?.focus()
   }
 
   function handleDialogKeys(event: KeyboardEvent<HTMLDivElement>) {
@@ -114,7 +123,7 @@ export function ProfilePage({ onAccountDeleted }: ProfilePageProps) {
       {!profile ? loading ? <p className="profile-state" role="status">Loading your profile…</p>
         : error ? <div className="profile-state">
           <p className="auth-errors" role="alert">Could not load your profile. Try again.</p>
-          <button className="profile-secondary" type="button" onClick={() => void loadProfile().catch(() => undefined)}>Try again</button>
+          <button className="profile-secondary" type="button" onClick={() => { setProfileUpdated(false); void loadProfile().catch(() => undefined) }}>Try again</button>
         </div>
           : <p className="profile-state">{session ? 'Your profile is unavailable.' : 'Sign in to view your profile.'}</p>
         : <>
@@ -137,6 +146,7 @@ export function ProfilePage({ onAccountDeleted }: ProfilePageProps) {
               </select>
             </div>
             {editError && <p className="auth-errors" role="alert">{editError}</p>}
+            {profileUpdated && <p className="profile-success" role="status">Profile updated</p>}
             {editing ? <div className="profile-actions">
               <button className="profile-secondary" type="button" onClick={cancelEditing} disabled={saving}>Cancel</button>
               <button className="auth-submit" type="submit" disabled={saving}>{saving ? 'Saving changes…' : 'Save changes'}</button>
