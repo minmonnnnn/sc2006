@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { VehicleType } from '@smart-parking/shared-types'
 import { PasswordField } from '../features/auth/PasswordField'
@@ -18,6 +18,11 @@ export function SignUpPage({ onSwitchMode }: SignUpPageProps) {
   const [errors, setErrors] = useState<string[]>([])
   const [pending, setPending] = useState(false)
   const [registered, setRegistered] = useState(false)
+  const successHeadingRef = useRef<HTMLHeadingElement>(null)
+
+  useEffect(() => {
+    if (registered) successHeadingRef.current?.focus()
+  }, [registered])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -50,8 +55,10 @@ export function SignUpPage({ onSwitchMode }: SignUpPageProps) {
       <div className="auth-mark" aria-hidden="true"><span>P</span><i /><i /><i /></div>
       <p className="auth-eyebrow">SMART PARKING · SINGAPORE</p>
       {registered ? <>
-        <h1 id="sign-up-title">Account created</h1>
-        <p className="auth-intro">Your account is ready. Sign in to start finding parking.</p>
+        <div role="status" aria-live="polite">
+          <h1 id="sign-up-title" ref={successHeadingRef} tabIndex={-1}>Account created</h1>
+          <p className="auth-intro">Your account is ready. Sign in to start finding parking.</p>
+        </div>
         <button className="auth-submit auth-confirm" type="button" onClick={onSwitchMode}>Continue to sign in</button>
       </> : <>
         <h1 id="sign-up-title">Start parking smarter.</h1>
