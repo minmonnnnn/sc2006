@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider, useAuth } from './AuthContext'
 import { AUTH_STORAGE_KEY } from './authStorage'
@@ -17,6 +17,17 @@ function deferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((done) => { resolve = done })
   return { promise, resolve }
+}
+
+function responseWithSettledJson(body: unknown, onSettled: () => void): Response {
+  const response = Response.json(body)
+  const parseJson = response.json.bind(response)
+  vi.spyOn(response, 'json').mockImplementation(async () => {
+    const value = await parseJson()
+    onSettled()
+    return value
+  })
+  return response
 }
 
 function Harness() {
@@ -119,6 +130,54 @@ describe('AuthContext', () => {
     expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) ?? '{}')).toEqual({ userId: 'user-1', token: 'secret-token' })
   })
 
+  it('keeps an existing profile load valid when login fails', async () => {
+    const profileResponse = deferred<Response>()
+    const fetchMock = vi.fn()
+      .mockReturnValueOnce(profileResponse.promise)
+      .mockResolvedValueOnce(Response.json({ error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, { status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ userId: 'user-1', token: 'secret-token' }))
+    const user = userEvent.setup()
+    renderAuth()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    await user.click(screen.getByText('login'))
+    await waitFor(() => expect(screen.getByTestId('operation')).toHaveTextContent('login-failed'))
+    const profileSettled = deferred<void>()
+    await act(async () => {
+      profileResponse.resolve(responseWithSettledJson(profile, profileSettled.resolve))
+      await profileSettled.promise
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('session')).toHaveTextContent('user-1')
+    expect(screen.getByTestId('profile')).toHaveTextContent('Driver')
+  })
+
+  it('keeps an existing profile load valid when account deletion fails', async () => {
+    const profileResponse = deferred<Response>()
+    const fetchMock = vi.fn()
+      .mockReturnValueOnce(profileResponse.promise)
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+    vi.stubGlobal('fetch', fetchMock)
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ userId: 'user-1', token: 'secret-token' }))
+    const user = userEvent.setup()
+    renderAuth()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    await user.click(screen.getByText('delete'))
+    await waitFor(() => expect(screen.getByTestId('operation')).toHaveTextContent('delete-failed'))
+    const profileSettled = deferred<void>()
+    await act(async () => {
+      profileResponse.resolve(responseWithSettledJson(profile, profileSettled.resolve))
+      await profileSettled.promise
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('session')).toHaveTextContent('user-1')
+    expect(screen.getByTestId('profile')).toHaveTextContent('Driver')
+  })
+
   it('ignores a profile response that arrives after logout', async () => {
     const profileResponse = deferred<Response>()
     const fetchMock = vi.fn().mockReturnValue(profileResponse.promise)
@@ -129,8 +188,12 @@ describe('AuthContext', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
 
     await user.click(screen.getByText('logout'))
-    profileResponse.resolve(Response.json(profile))
-    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('idle'))
+    const responseSettled = deferred<void>()
+    await act(async () => {
+      profileResponse.resolve(responseWithSettledJson(profile, responseSettled.resolve))
+      await responseSettled.promise
+      await Promise.resolve()
+    })
 
     expect(screen.getByTestId('session')).toHaveTextContent('signed-out')
     expect(screen.getByTestId('profile')).toHaveTextContent('no-profile')
@@ -149,8 +212,12 @@ describe('AuthContext', () => {
 
     await user.click(screen.getByText('delete'))
     await waitFor(() => expect(screen.getByTestId('operation')).toHaveTextContent('deleted'))
-    profileResponse.resolve(Response.json(profile))
-    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('idle'))
+    const responseSettled = deferred<void>()
+    await act(async () => {
+      profileResponse.resolve(responseWithSettledJson(profile, responseSettled.resolve))
+      await responseSettled.promise
+      await Promise.resolve()
+    })
 
     expect(screen.getByTestId('session')).toHaveTextContent('signed-out')
     expect(screen.getByTestId('profile')).toHaveTextContent('no-profile')
@@ -178,8 +245,12 @@ describe('AuthContext', () => {
 
     await user.click(screen.getByText('switch-account'))
     await waitFor(() => expect(screen.getByTestId('profile')).toHaveTextContent('Second'))
-    firstProfile.resolve(Response.json(profile))
-    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('idle'))
+    const responseSettled = deferred<void>()
+    await act(async () => {
+      firstProfile.resolve(responseWithSettledJson(profile, responseSettled.resolve))
+      await responseSettled.promise
+      await Promise.resolve()
+    })
 
     expect(screen.getByTestId('session')).toHaveTextContent('user-2')
     expect(screen.getByTestId('profile')).toHaveTextContent('Second')
@@ -187,6 +258,7 @@ describe('AuthContext', () => {
 
   it('does not accept a login response that arrives after logout', async () => {
     const loginResponse = deferred<Response>()
+    const responseSettled = deferred<void>()
     const fetchMock = vi.fn().mockReturnValue(loginResponse.promise)
     vi.stubGlobal('fetch', fetchMock)
     const user = userEvent.setup()
@@ -195,7 +267,11 @@ describe('AuthContext', () => {
     await user.click(screen.getByText('login'))
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     await user.click(screen.getByText('logout'))
-    loginResponse.resolve(Response.json({ userId: 'user-1', token: 'late-token' }))
+    await act(async () => {
+      loginResponse.resolve(responseWithSettledJson({ userId: 'user-1', token: 'late-token' }, responseSettled.resolve))
+      await responseSettled.promise
+      await Promise.resolve()
+    })
     await waitFor(() => expect(screen.getByTestId('operation')).toHaveTextContent('login-settled'))
 
     expect(screen.getByTestId('session')).toHaveTextContent('signed-out')
@@ -205,6 +281,8 @@ describe('AuthContext', () => {
   it('ignores an older login response after a newer login succeeds', async () => {
     const firstLogin = deferred<Response>()
     const secondLogin = deferred<Response>()
+    const firstSettled = deferred<void>()
+    const secondSettled = deferred<void>()
     let loginRequests = 0
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       if (String(input).endsWith('/api/auth/login')) {
@@ -224,11 +302,19 @@ describe('AuthContext', () => {
     await waitFor(() => expect(loginRequests).toBe(1))
     await user.click(screen.getByText('switch-account'))
     await waitFor(() => expect(loginRequests).toBe(2))
-    secondLogin.resolve(Response.json({ userId: 'user-2', token: 'second-token' }))
+    await act(async () => {
+      secondLogin.resolve(responseWithSettledJson({ userId: 'user-2', token: 'second-token' }, secondSettled.resolve))
+      await secondSettled.promise
+      await Promise.resolve()
+    })
     await waitFor(() => expect(screen.getByTestId('session')).toHaveTextContent('user-2'))
-    firstLogin.resolve(Response.json({ userId: 'user-1', token: 'first-token' }))
+    await act(async () => {
+      firstLogin.resolve(responseWithSettledJson({ userId: 'user-1', token: 'first-token' }, firstSettled.resolve))
+      await firstSettled.promise
+      await Promise.resolve()
+    })
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
-    await waitFor(() => expect(screen.getByTestId('operation')).toHaveTextContent('login-settled'))
+    await waitFor(() => expect(screen.getByTestId('profile')).toHaveTextContent('Second'))
 
     expect(screen.getByTestId('session')).toHaveTextContent('user-2')
     expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) ?? '{}')).toEqual({ userId: 'user-2', token: 'second-token' })
