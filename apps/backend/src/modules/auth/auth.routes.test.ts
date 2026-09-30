@@ -118,6 +118,30 @@ describe('bearer authentication middleware', () => {
       .expect(401, { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } })
   })
 
+  it('rejects duplicate Authorization fields before verifying a token', async () => {
+    let authorizationFields = 0
+    let verificationCalls = 0
+    const authGateway = gateway({
+      verifyToken: async () => { verificationCalls += 1; return { userId: 'user-1' } },
+    })
+    const users = express.Router().get('/me', (incoming, _response, next) => {
+      authorizationFields = incoming.rawHeaders.filter((header, index) =>
+        index % 2 === 0 && header.toLowerCase() === 'authorization',
+      ).length
+      next()
+    }, createRequireAuth(authGateway), (incoming, response) => {
+      response.json(incoming.auth)
+    })
+
+    // Supertest sends array values as repeated fields, though its types only accept strings.
+    const response = await request(createApp({ users })).get('/api/users/me')
+      .set('Authorization', ['Bearer first', 'Bearer second'] as unknown as string)
+    expect(authorizationFields).toBe(2)
+    expect(response.status).toBe(401)
+    expect(response.body).toEqual({ error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } })
+    expect(verificationCalls).toBe(0)
+  })
+
   it('attaches a verified user ID to the request', async () => {
     let receivedToken: string | undefined
     const authGateway = gateway({
