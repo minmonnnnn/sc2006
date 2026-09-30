@@ -20,6 +20,8 @@ function gateway(overrides: Partial<AuthGateway> = {}): AuthGateway {
     removeAuthUser: async () => {},
     login: async () => ({ userId: 'user-1', token: 'access-token' }),
     verifyToken: async () => ({ userId: 'user-1' }),
+    getProfile: async () => null,
+    updateProfile: async () => null,
     ...overrides,
   }
 }

@@ -1,4 +1,4 @@
-import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse } from '@smart-parking/shared-types'
+import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse, UpdateProfileRequest, User } from '@smart-parking/shared-types'
 import { ApiException } from '../../lib/api-error.js'
 import { AuthGatewayError, type AuthGateway } from './auth.types.js'
 
@@ -39,6 +39,36 @@ export function createAuthService(gateway: AuthGateway) {
         if (error instanceof AuthGatewayError && error.kind === 'INVALID_CREDENTIALS') {
           throw new ApiException(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
         }
+        throw unavailable()
+      }
+    },
+
+    async getProfile(userId: string): Promise<User> {
+      let profile: User | null
+      try {
+        profile = await gateway.getProfile(userId)
+      } catch {
+        throw unavailable()
+      }
+      if (!profile) throw new ApiException(404, 'NOT_FOUND', 'Profile not found')
+      return profile
+    },
+
+    async updateProfile(userId: string, patch: UpdateProfileRequest): Promise<User> {
+      let profile: User | null
+      try {
+        profile = await gateway.updateProfile(userId, patch)
+      } catch {
+        throw unavailable()
+      }
+      if (!profile) throw new ApiException(404, 'NOT_FOUND', 'Profile not found')
+      return profile
+    },
+
+    async deleteAccount(userId: string): Promise<void> {
+      try {
+        await gateway.removeAuthUser(userId)
+      } catch {
         throw unavailable()
       }
     },

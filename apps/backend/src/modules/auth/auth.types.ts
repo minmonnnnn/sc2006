@@ -1,4 +1,4 @@
-import type { LoginRequest, RegisterRequest } from '@smart-parking/shared-types'
+import type { LoginRequest, RegisterRequest, UpdateProfileRequest, User } from '@smart-parking/shared-types'
 
 export interface AuthGateway {
   register(input: RegisterRequest): Promise<{ userId: string }>
@@ -6,6 +6,8 @@ export interface AuthGateway {
   removeAuthUser(userId: string): Promise<void>
   login(input: LoginRequest): Promise<{ userId: string; token: string }>
   verifyToken(token: string): Promise<{ userId: string } | null>
+  getProfile(userId: string): Promise<User | null>
+  updateProfile(userId: string, patch: UpdateProfileRequest): Promise<User | null>
 }
 
 export interface AuthContext { userId: string }
