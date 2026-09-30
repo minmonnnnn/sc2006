@@ -1,8 +1,20 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { User, VehicleType } from '@smart-parking/shared-types'
 import type { BackendEnv } from '../config/env.js'
 import { AuthGatewayError, type AuthGateway } from '../modules/auth/auth.types.js'
 
 type Clients = { adminClient: SupabaseClient; loginClient: SupabaseClient }
+type ProfileRow = { id: string; name: string; vehicle_type: VehicleType; created_at: string }
+
+function mapProfile(row: ProfileRow, email: string): User {
+  return {
+    id: row.id,
+    email,
+    name: row.name,
+    vehicleType: row.vehicle_type,
+    createdAt: row.created_at,
+  }
+}
 
 async function safe<T>(action: () => Promise<T>): Promise<T> {
   try {
@@ -22,6 +34,12 @@ export function createSupabaseClients(env: Pick<BackendEnv, 'supabaseUrl' | 'sup
 }
 
 export function createSupabaseAuthGateway({ adminClient, loginClient }: Clients): AuthGateway {
+  async function profileEmail(userId: string): Promise<string> {
+    const { data, error } = await adminClient.auth.admin.getUserById(userId)
+    if (error || !data.user?.email) throw new AuthGatewayError('UNAVAILABLE')
+    return data.user.email
+  }
+
   return {
     register: (input) => safe(async () => {
       const { data, error } = await adminClient.auth.admin.createUser({
@@ -67,6 +85,31 @@ export function createSupabaseAuthGateway({ adminClient, loginClient }: Clients)
         throw new AuthGatewayError('UNAVAILABLE')
       }
       return data.user ? { userId: data.user.id } : null
+    }),
+
+    getProfile: (userId) => safe(async () => {
+      const { data, error } = await adminClient.from('profiles')
+        .select('id, name, vehicle_type, created_at')
+        .eq('id', userId)
+        .maybeSingle()
+      if (error) throw new AuthGatewayError('UNAVAILABLE')
+      if (!data) return null
+      return mapProfile(data as ProfileRow, await profileEmail(userId))
+    }),
+
+    updateProfile: (userId, patch) => safe(async () => {
+      const email = await profileEmail(userId)
+      const { data, error } = await adminClient.from('profiles')
+        .update({
+          ...(patch.name === undefined ? {} : { name: patch.name }),
+          ...(patch.vehicleType === undefined ? {} : { vehicle_type: patch.vehicleType }),
+        })
+        .eq('id', userId)
+        .select('id, name, vehicle_type, created_at')
+        .maybeSingle()
+      if (error) throw new AuthGatewayError('UNAVAILABLE')
+      if (!data) return null
+      return mapProfile(data as ProfileRow, email)
     }),
   }
 }
