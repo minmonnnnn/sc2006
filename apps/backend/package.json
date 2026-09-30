@@ -4,6 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "keywords": [],
