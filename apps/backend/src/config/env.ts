@@ -2,6 +2,7 @@ export interface BackendEnv {
   supabaseUrl: string
   supabaseServiceRoleKey: string
   port: number
+  frontendOrigin: string
 }
 
 export function loadEnv(source: Record<string, string | undefined>): BackendEnv {
@@ -17,5 +18,13 @@ export function loadEnv(source: Record<string, string | undefined>): BackendEnv 
     throw new Error('PORT must be an integer from 1 to 65535')
   }
 
-  return { supabaseUrl, supabaseServiceRoleKey, port }
+  const frontendOrigin = source.FRONTEND_ORIGIN?.trim() ?? 'http://localhost:5173'
+  try {
+    const url = new URL(frontendOrigin)
+    if (!['http:', 'https:'].includes(url.protocol) || url.origin !== frontendOrigin) throw new Error()
+  } catch {
+    throw new Error('FRONTEND_ORIGIN must be an HTTP(S) origin without a path or trailing slash')
+  }
+
+  return { supabaseUrl, supabaseServiceRoleKey, port, frontendOrigin }
 }

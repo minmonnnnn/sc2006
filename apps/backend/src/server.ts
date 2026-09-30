@@ -11,6 +11,7 @@ const clients = createSupabaseClients(env)
 const authGateway = createSupabaseAuthGateway(clients)
 const favouritesGateway = createSupabaseFavouritesGateway(clients.adminClient)
 createApp({
+  frontendOrigin: env.frontendOrigin,
   auth: createAuthRouter({ gateway: authGateway }),
   users: createUsersRouter({ gateway: authGateway }),
   favourites: createFavouritesRouter({ authGateway, gateway: favouritesGateway }),

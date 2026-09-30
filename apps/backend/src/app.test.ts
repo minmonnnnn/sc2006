@@ -7,6 +7,16 @@ import { ApiException } from './lib/api-error.js'
 const fakeDependencies = {}
 
 describe('createApp', () => {
+  it('allows a configured frontend origin and rejects the previous local origin', async () => {
+    const app = createApp({ frontendOrigin: 'https://parking.example' })
+    const allowed = await request(app).options('/api/users/me')
+      .set('Origin', 'https://parking.example')
+      .set('Access-Control-Request-Method', 'PUT').expect(204)
+    expect(allowed.headers['access-control-allow-origin']).toBe('https://parking.example')
+    const denied = await request(app).get('/health').set('Origin', 'http://localhost:5173').expect(200)
+    expect(denied.headers['access-control-allow-origin']).toBeUndefined()
+  })
+
   it('serves health without constructing live Supabase dependencies', async () => {
     await request(createApp(fakeDependencies)).get('/health').expect(200, { ok: true })
   })
