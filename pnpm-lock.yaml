@@ -280,7 +280,11 @@ importers:
         specifier: ^8.3.0
         version: 8.3.0(@types/node@24.13.4)
 
-  packages/shared-types: {}
+  packages/shared-types:
+    devDependencies:
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
 
 packages:
 
