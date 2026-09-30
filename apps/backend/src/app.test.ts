@@ -20,6 +20,25 @@ describe('createApp', () => {
     expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5173')
   })
 
+  it('allows browser preflight from the configured frontend origin', async () => {
+    const response = await request(createApp(fakeDependencies))
+      .options('/api/users/me')
+      .set('Origin', 'http://localhost:5173')
+      .set('Access-Control-Request-Method', 'GET')
+      .expect(204)
+
+    expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5173')
+  })
+
+  it('does not allow browser requests from other origins', async () => {
+    const response = await request(createApp(fakeDependencies))
+      .get('/health')
+      .set('Origin', 'https://untrusted.example')
+      .expect(200)
+
+    expect(response.headers['access-control-allow-origin']).toBeUndefined()
+  })
+
   it('mounts injected feature routers under their API paths', async () => {
     const auth = express.Router().post('/login', (_request, response) => {
       response.json({ reached: 'auth' })

@@ -59,7 +59,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const login = useCallback(async (input: LoginRequest): Promise<void> => {
     const operation = ++authOperationRef.current
-    profileOperationRef.current += 1
     setLoading(true)
     setError(null)
     try {
@@ -121,7 +120,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const requestSession = sessionRef.current
     if (!requestSession) throw new Error('Not authenticated')
     const operation = ++authOperationRef.current
-    profileOperationRef.current += 1
     setLoading(true)
     setError(null)
     try {
