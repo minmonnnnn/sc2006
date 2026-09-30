@@ -1,4 +1,5 @@
 import express, { type Express, type Router } from 'express'
+import cors from 'cors'
 import { ApiException, errorHandler } from './lib/api-error.js'
 
 export interface AppDependencies {
@@ -9,6 +10,7 @@ export interface AppDependencies {
 
 export function createApp(dependencies: AppDependencies): Express {
   const app = express()
+  app.use(cors({ origin: 'http://localhost:5173' }))
   app.use(express.json())
   app.get('/health', (_request, response) => {
     response.json({ ok: true })

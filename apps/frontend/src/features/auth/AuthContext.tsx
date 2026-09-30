@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { PropsWithChildren } from 'react'
 import type { LoginResponse, RegisterResponse, UpdateProfileRequest, User } from '@smart-parking/shared-types'
 import { apiRequest } from '../../lib/apiClient'
@@ -9,24 +9,29 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<AuthSession | null>(() => loadSession())
+  const sessionRef = useRef(session)
+  const authOperationRef = useRef(0)
+  const profileOperationRef = useRef(0)
   const [profile, setProfile] = useState<User | null>(null)
   const [loading, setLoading] = useState(() => session !== null)
   const [error, setError] = useState<Error | null>(null)
 
   const loadProfile = useCallback(async (): Promise<User> => {
-    if (!session) throw new Error('Not authenticated')
+    const requestSession = session
+    if (!requestSession || sessionRef.current !== requestSession) throw new Error('Not authenticated')
+    const operation = ++profileOperationRef.current
     setLoading(true)
     setError(null)
     try {
-      const result = await apiRequest<User>('/api/users/me', { token: session.token })
-      setProfile(result)
+      const result = await apiRequest<User>('/api/users/me', { token: requestSession.token })
+      if (sessionRef.current === requestSession && profileOperationRef.current === operation) setProfile(result)
       return result
     } catch (cause) {
       const nextError = cause instanceof Error ? cause : new Error('Profile request failed')
-      setError(nextError)
+      if (sessionRef.current === requestSession && profileOperationRef.current === operation) setError(nextError)
       throw nextError
     } finally {
-      setLoading(false)
+      if (sessionRef.current === requestSession && profileOperationRef.current === operation) setLoading(false)
     }
   }, [session])
 
@@ -38,10 +43,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setLoading(true)
     setError(null)
     try {
-      return await apiRequest<RegisterResponse>('/api/auth/register', {
+      const result = await apiRequest<RegisterResponse>('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify(input),
       })
+      return result
     } catch (cause) {
       const nextError = cause instanceof Error ? cause : new Error('Registration failed')
       setError(nextError)
@@ -52,6 +58,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [])
 
   const login = useCallback(async (input: LoginRequest): Promise<void> => {
+    const operation = ++authOperationRef.current
+    profileOperationRef.current += 1
     setLoading(true)
     setError(null)
     try {
@@ -59,19 +67,26 @@ export function AuthProvider({ children }: PropsWithChildren) {
         method: 'POST',
         body: JSON.stringify(input),
       })
+      if (authOperationRef.current !== operation) return
       const nextSession = { userId: result.userId, token: result.token }
+      sessionRef.current = nextSession
+      profileOperationRef.current += 1
       saveSession(nextSession)
       setSession(nextSession)
+      setProfile(null)
     } catch (cause) {
       const nextError = cause instanceof Error ? cause : new Error('Login failed')
-      setError(nextError)
+      if (authOperationRef.current === operation) setError(nextError)
       throw nextError
     } finally {
-      setLoading(false)
+      if (authOperationRef.current === operation) setLoading(false)
     }
   }, [])
 
   const logout = useCallback(() => {
+    authOperationRef.current += 1
+    profileOperationRef.current += 1
+    sessionRef.current = null
     clearSession()
     setSession(null)
     setProfile(null)
@@ -80,43 +95,53 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [])
 
   const updateProfile = useCallback(async (input: UpdateProfileRequest): Promise<User> => {
-    if (!session) throw new Error('Not authenticated')
+    const requestSession = sessionRef.current
+    if (!requestSession) throw new Error('Not authenticated')
+    const operation = ++profileOperationRef.current
     setLoading(true)
     setError(null)
     try {
       const result = await apiRequest<User>('/api/users/me', {
         method: 'PUT',
-        token: session.token,
+        token: requestSession.token,
         body: JSON.stringify(input),
       })
-      setProfile(result)
+      if (sessionRef.current === requestSession && profileOperationRef.current === operation) setProfile(result)
       return result
     } catch (cause) {
       const nextError = cause instanceof Error ? cause : new Error('Profile update failed')
-      setError(nextError)
+      if (sessionRef.current === requestSession && profileOperationRef.current === operation) setError(nextError)
       throw nextError
     } finally {
-      setLoading(false)
+      if (sessionRef.current === requestSession && profileOperationRef.current === operation) setLoading(false)
     }
-  }, [session])
+  }, [])
 
   const deleteAccount = useCallback(async (): Promise<void> => {
-    if (!session) throw new Error('Not authenticated')
+    const requestSession = sessionRef.current
+    if (!requestSession) throw new Error('Not authenticated')
+    const operation = ++authOperationRef.current
+    profileOperationRef.current += 1
     setLoading(true)
     setError(null)
     try {
-      await apiRequest<void>('/api/users/me', { method: 'DELETE', token: session.token })
-      clearSession()
-      setSession(null)
-      setProfile(null)
+      await apiRequest<void>('/api/users/me', { method: 'DELETE', token: requestSession.token })
+      if (authOperationRef.current === operation && sessionRef.current === requestSession) {
+        profileOperationRef.current += 1
+        sessionRef.current = null
+        clearSession()
+        setSession(null)
+        setProfile(null)
+        setLoading(false)
+      }
     } catch (cause) {
       const nextError = cause instanceof Error ? cause : new Error('Account deletion failed')
-      setError(nextError)
+      if (authOperationRef.current === operation && sessionRef.current === requestSession) setError(nextError)
       throw nextError
     } finally {
-      setLoading(false)
+      if (authOperationRef.current === operation && sessionRef.current === requestSession) setLoading(false)
     }
-  }, [session])
+  }, [])
 
   const value = useMemo<AuthContextValue>(() => ({
     session, profile, loading, error, register, login, logout, loadProfile, updateProfile, deleteAccount,

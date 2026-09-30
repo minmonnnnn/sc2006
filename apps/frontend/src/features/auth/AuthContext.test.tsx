@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider, useAuth } from './AuthContext'
@@ -12,15 +13,25 @@ const profile = {
   createdAt: '2026-09-30T00:00:00.000Z',
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => { resolve = done })
+  return { promise, resolve }
+}
+
 function Harness() {
   const auth = useAuth()
+  const [operation, setOperation] = useState('idle')
   return <>
     <output data-testid="session">{auth.session?.userId ?? 'signed-out'}</output>
     <output data-testid="profile">{auth.profile?.name ?? 'no-profile'}</output>
-    <button onClick={() => void auth.register({ email: profile.email, password: 'secret', name: profile.name, vehicleType: 'EV' })}>register</button>
-    <button onClick={() => void auth.login({ email: profile.email, password: 'secret' })}>login</button>
+    <output data-testid="loading">{auth.loading ? 'loading' : 'idle'}</output>
+    <output data-testid="operation">{operation}</output>
+    <button onClick={() => void auth.register({ email: profile.email, password: 'secret', name: profile.name, vehicleType: 'EV' }).then(() => setOperation('registered'), () => setOperation('register-failed'))}>register</button>
+    <button onClick={() => void auth.login({ email: profile.email, password: 'secret' }).then(() => setOperation('login-settled'), () => setOperation('login-failed'))}>login</button>
+    <button onClick={() => void auth.login({ email: 'second@example.com', password: 'secret' }).then(() => setOperation('login-settled'), () => setOperation('login-failed'))}>switch-account</button>
     <button onClick={() => void auth.logout()}>logout</button>
-    <button onClick={() => void auth.deleteAccount().catch(() => undefined)}>delete</button>
+    <button onClick={() => void auth.deleteAccount().then(() => setOperation('deleted'), () => setOperation('delete-failed'))}>delete</button>
   </>
 }
 
@@ -65,14 +76,18 @@ describe('AuthContext', () => {
   })
 
   it('does not authenticate after registration', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(
       { userId: 'user-1', email: profile.email, name: profile.name }, { status: 201 },
-    )))
+    ))
+    vi.stubGlobal('fetch', fetchMock)
     const user = userEvent.setup()
     renderAuth()
     await user.click(screen.getByText('register'))
 
-    await waitFor(() => expect(screen.getByTestId('session')).toHaveTextContent('signed-out'))
+    await waitFor(() => expect(screen.getByTestId('operation')).toHaveTextContent('registered'))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/auth/register')
+    expect(screen.getByTestId('session')).toHaveTextContent('signed-out')
     expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
   })
 
@@ -88,12 +103,134 @@ describe('AuthContext', () => {
 
   it('preserves the session when account deletion fails', async () => {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ userId: 'user-1', token: 'secret-token' }))
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })))
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json(profile))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+    vi.stubGlobal('fetch', fetchMock)
     const user = userEvent.setup()
     renderAuth()
     await user.click(screen.getByText('delete'))
 
-    await waitFor(() => expect(screen.getByTestId('session')).toHaveTextContent('user-1'))
+    await waitFor(() => expect(screen.getByTestId('operation')).toHaveTextContent('delete-failed'))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'DELETE' })
+    expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get('Authorization')).toBe('Bearer secret-token')
+    expect(screen.getByTestId('session')).toHaveTextContent('user-1')
     expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) ?? '{}')).toEqual({ userId: 'user-1', token: 'secret-token' })
+  })
+
+  it('ignores a profile response that arrives after logout', async () => {
+    const profileResponse = deferred<Response>()
+    const fetchMock = vi.fn().mockReturnValue(profileResponse.promise)
+    vi.stubGlobal('fetch', fetchMock)
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ userId: 'user-1', token: 'secret-token' }))
+    const user = userEvent.setup()
+    renderAuth()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    await user.click(screen.getByText('logout'))
+    profileResponse.resolve(Response.json(profile))
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('idle'))
+
+    expect(screen.getByTestId('session')).toHaveTextContent('signed-out')
+    expect(screen.getByTestId('profile')).toHaveTextContent('no-profile')
+  })
+
+  it('ignores a profile response that arrives after successful account deletion', async () => {
+    const profileResponse = deferred<Response>()
+    const fetchMock = vi.fn()
+      .mockReturnValueOnce(profileResponse.promise)
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ userId: 'user-1', token: 'secret-token' }))
+    const user = userEvent.setup()
+    renderAuth()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    await user.click(screen.getByText('delete'))
+    await waitFor(() => expect(screen.getByTestId('operation')).toHaveTextContent('deleted'))
+    profileResponse.resolve(Response.json(profile))
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('idle'))
+
+    expect(screen.getByTestId('session')).toHaveTextContent('signed-out')
+    expect(screen.getByTestId('profile')).toHaveTextContent('no-profile')
+  })
+
+  it('ignores a profile response from the previous account', async () => {
+    const firstProfile = deferred<Response>()
+    let profileRequests = 0
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/api/users/me')) {
+        profileRequests += 1
+        return profileRequests === 1 ? firstProfile.promise : Promise.resolve(Response.json({ ...profile, id: 'user-2', name: 'Second' }))
+      }
+      if (url.endsWith('/api/auth/login')) {
+        return Promise.resolve(Response.json({ userId: 'user-2', token: 'second-token' }))
+      }
+      return Promise.reject(new Error(`Unexpected request ${url} ${init?.method ?? 'GET'}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ userId: 'user-1', token: 'first-token' }))
+    const user = userEvent.setup()
+    renderAuth()
+    await waitFor(() => expect(profileRequests).toBe(1))
+
+    await user.click(screen.getByText('switch-account'))
+    await waitFor(() => expect(screen.getByTestId('profile')).toHaveTextContent('Second'))
+    firstProfile.resolve(Response.json(profile))
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('idle'))
+
+    expect(screen.getByTestId('session')).toHaveTextContent('user-2')
+    expect(screen.getByTestId('profile')).toHaveTextContent('Second')
+  })
+
+  it('does not accept a login response that arrives after logout', async () => {
+    const loginResponse = deferred<Response>()
+    const fetchMock = vi.fn().mockReturnValue(loginResponse.promise)
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderAuth()
+
+    await user.click(screen.getByText('login'))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    await user.click(screen.getByText('logout'))
+    loginResponse.resolve(Response.json({ userId: 'user-1', token: 'late-token' }))
+    await waitFor(() => expect(screen.getByTestId('operation')).toHaveTextContent('login-settled'))
+
+    expect(screen.getByTestId('session')).toHaveTextContent('signed-out')
+    expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
+  })
+
+  it('ignores an older login response after a newer login succeeds', async () => {
+    const firstLogin = deferred<Response>()
+    const secondLogin = deferred<Response>()
+    let loginRequests = 0
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input).endsWith('/api/auth/login')) {
+        loginRequests += 1
+        return loginRequests === 1 ? firstLogin.promise : secondLogin.promise
+      }
+      if (String(input).endsWith('/api/users/me')) {
+        return Promise.resolve(Response.json({ ...profile, id: 'user-2', name: 'Second' }))
+      }
+      return Promise.reject(new Error(`Unexpected request ${String(input)}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderAuth()
+
+    await user.click(screen.getByText('login'))
+    await waitFor(() => expect(loginRequests).toBe(1))
+    await user.click(screen.getByText('switch-account'))
+    await waitFor(() => expect(loginRequests).toBe(2))
+    secondLogin.resolve(Response.json({ userId: 'user-2', token: 'second-token' }))
+    await waitFor(() => expect(screen.getByTestId('session')).toHaveTextContent('user-2'))
+    firstLogin.resolve(Response.json({ userId: 'user-1', token: 'first-token' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(screen.getByTestId('operation')).toHaveTextContent('login-settled'))
+
+    expect(screen.getByTestId('session')).toHaveTextContent('user-2')
+    expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) ?? '{}')).toEqual({ userId: 'user-2', token: 'second-token' })
   })
 })

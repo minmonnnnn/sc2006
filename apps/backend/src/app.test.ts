@@ -11,6 +11,15 @@ describe('createApp', () => {
     await request(createApp(fakeDependencies)).get('/health').expect(200, { ok: true })
   })
 
+  it('allows cross-origin browser requests', async () => {
+    const response = await request(createApp(fakeDependencies))
+      .get('/health')
+      .set('Origin', 'http://localhost:5173')
+      .expect(200)
+
+    expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5173')
+  })
+
   it('mounts injected feature routers under their API paths', async () => {
     const auth = express.Router().post('/login', (_request, response) => {
       response.json({ reached: 'auth' })
