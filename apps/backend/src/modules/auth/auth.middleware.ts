@@ -4,6 +4,11 @@ import type { AuthGateway } from './auth.types.js'
 
 export function createRequireAuth(gateway: AuthGateway): RequestHandler {
   return async (request, _response, next) => {
+    const authorizationCount = request.rawHeaders.filter((header, index) =>
+      index % 2 === 0 && header.toLowerCase() === 'authorization',
+    ).length
+    if (authorizationCount !== 1) throw new ApiException(401, 'UNAUTHORIZED', 'Unauthorized')
+
     const match = /^Bearer ([^\s,]+)$/i.exec(request.headers.authorization ?? '')
     if (!match) throw new ApiException(401, 'UNAUTHORIZED', 'Unauthorized')
 
