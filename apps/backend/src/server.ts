@@ -2,8 +2,16 @@ import 'dotenv/config'
 import { createApp } from './app.js'
 import { loadEnv } from './config/env.js'
 import { createSupabaseAuthGateway, createSupabaseClients } from './lib/supabase.js'
+import { createSupabaseFavouritesGateway } from './lib/supabase-favourites.js'
 import { createAuthRouter, createUsersRouter } from './modules/auth/auth.routes.js'
+import { createFavouritesRouter } from './modules/favourites/favourites.routes.js'
 
 const env = loadEnv(process.env)
-const gateway = createSupabaseAuthGateway(createSupabaseClients(env))
-createApp({ auth: createAuthRouter({ gateway }), users: createUsersRouter({ gateway }) }).listen(env.port)
+const clients = createSupabaseClients(env)
+const authGateway = createSupabaseAuthGateway(clients)
+const favouritesGateway = createSupabaseFavouritesGateway(clients.adminClient)
+createApp({
+  auth: createAuthRouter({ gateway: authGateway }),
+  users: createUsersRouter({ gateway: authGateway }),
+  favourites: createFavouritesRouter({ authGateway, gateway: favouritesGateway }),
+}).listen(env.port)
