@@ -5,7 +5,7 @@
   --auth-blue: var(--auth-color-navigation, #2563eb);
   --auth-orange: var(--auth-color-action, #ffc768);
   --auth-green: var(--auth-color-success, #10b981);
-  --auth-error: var(--auth-color-error, #b91c1c);
+  --auth-error: var(--auth-blue);
   box-sizing: border-box;
   min-height: 100svh;
   width: 100%;
