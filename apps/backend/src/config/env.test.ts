@@ -25,6 +25,7 @@ describe('loadEnv', () => {
       supabaseUrl: validSource.SUPABASE_URL,
       supabaseServiceRoleKey: validSource.SUPABASE_SERVICE_ROLE_KEY,
       port: 4000,
+      frontendOrigin: 'http://localhost:5173',
     })
   })
 
@@ -34,5 +35,13 @@ describe('loadEnv', () => {
 
   it('defaults to port 4000 when PORT is absent', () => {
     expect(loadEnv(validSource).port).toBe(4000)
+  })
+
+  it('accepts a trimmed frontend origin', () => {
+    expect(loadEnv({ ...validSource, FRONTEND_ORIGIN: ' https://parking.example ' }).frontendOrigin).toBe('https://parking.example')
+  })
+
+  it.each(['', '*', 'null', 'not-a-url', 'ftp://parking.example', 'https://parking.example/path', 'https://user:pass@parking.example', 'https://parking.example?x=1'])('rejects invalid frontend origin %j', (origin) => {
+    expect(() => loadEnv({ ...validSource, FRONTEND_ORIGIN: origin })).toThrow('FRONTEND_ORIGIN')
   })
 })

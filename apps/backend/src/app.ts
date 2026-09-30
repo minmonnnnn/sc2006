@@ -3,6 +3,7 @@ import cors from 'cors'
 import { ApiException, errorHandler } from './lib/api-error.js'
 
 export interface AppDependencies {
+  frontendOrigin?: string
   auth?: Router
   users?: Router
   favourites?: Router
@@ -10,7 +11,7 @@ export interface AppDependencies {
 
 export function createApp(dependencies: AppDependencies): Express {
   const app = express()
-  app.use(cors({ origin: ['http://localhost:5173'] }))
+  app.use(cors({ origin: [dependencies.frontendOrigin ?? 'http://localhost:5173'] }))
   app.use(express.json())
   app.get('/health', (_request, response) => {
     response.json({ ok: true })
