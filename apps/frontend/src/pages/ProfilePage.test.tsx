@@ -105,8 +105,33 @@ describe('ProfilePage', () => {
     await waitFor(() => expect(screen.getByLabelText('Full name')).toHaveValue('Avery Lee'))
     expect(screen.getByLabelText('Full name')).toHaveAttribute('readonly')
     expect(screen.getByLabelText('Vehicle type')).toHaveValue('Hybrid')
+    expect(screen.getByRole('status')).toHaveTextContent('Profile updated')
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'PUT' })
     expect(JSON.parse(fetchMock.mock.calls[1]?.[1]?.body)).toEqual({ name: 'Avery Lee', vehicleType: 'Hybrid' })
+
+    await user.click(screen.getByRole('button', { name: 'Edit profile' }))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('keeps the edit form and entered values after a failed update', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json(profile))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+    vi.stubGlobal('fetch', fetchMock)
+    renderProfile()
+    const user = userEvent.setup()
+    await screen.findByDisplayValue('Avery Tan')
+    await user.click(screen.getByRole('button', { name: 'Edit profile' }))
+    await user.clear(screen.getByLabelText('Full name'))
+    await user.type(screen.getByLabelText('Full name'), 'Avery Lee')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Request failed')
+    expect(screen.getByLabelText('Full name')).toHaveValue('Avery Lee')
+    expect(screen.getByLabelText('Full name')).not.toHaveAttribute('readonly')
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    expect(localStorage.getItem(AUTH_STORAGE_KEY)).not.toBeNull()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('validates an empty name without sending an update', async () => {
@@ -136,10 +161,59 @@ describe('ProfilePage', () => {
     const dialog = screen.getByRole('dialog', { name: 'Delete your account?' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()
+    const focusStates: Array<{ dialogOpen: boolean; backgroundInert: boolean }> = []
+    const originalFocus = openButton.focus.bind(openButton)
+    vi.spyOn(openButton, 'focus').mockImplementation(() => {
+      focusStates.push({ dialogOpen: !!screen.queryByRole('dialog'), backgroundInert: openButton.closest('.profile-panel')?.hasAttribute('inert') ?? false })
+      originalFocus()
+    })
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(openButton).toHaveFocus()
+    expect(focusStates).toEqual([{ dialogOpen: false, backgroundInert: false }])
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns focus after Cancel closes the confirmation', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(profile)))
+    renderProfile()
+    const user = userEvent.setup()
+    await screen.findByDisplayValue('Avery Tan')
+    const openButton = screen.getByRole('button', { name: 'Delete account' })
+    await user.click(openButton)
+    const focusStates: Array<{ dialogOpen: boolean; backgroundInert: boolean }> = []
+    const originalFocus = openButton.focus.bind(openButton)
+    vi.spyOn(openButton, 'focus').mockImplementation(() => {
+      focusStates.push({ dialogOpen: !!screen.queryByRole('dialog'), backgroundInert: openButton.closest('.profile-panel')?.hasAttribute('inert') ?? false })
+      originalFocus()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(openButton).toHaveFocus()
+    expect(focusStates).toEqual([{ dialogOpen: false, backgroundInert: false }])
+  })
+
+  it('keeps Tab focus inside the confirmation dialog', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(profile)))
+    renderProfile()
+    const user = userEvent.setup()
+    await screen.findByDisplayValue('Avery Tan')
+    await user.click(screen.getByRole('button', { name: 'Delete account' }))
+    const dialog = screen.getByRole('dialog')
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    const confirm = dialog.querySelector('button[type="submit"]')!
+
+    expect(cancel).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(confirm).toHaveFocus()
+    await user.tab()
+    expect(cancel).toHaveFocus()
+    await user.tab()
+    expect(confirm).toHaveFocus()
+    await user.tab()
+    expect(cancel).toHaveFocus()
+    expect(screen.getByRole('main').querySelector('section')).toHaveAttribute('inert')
   })
 
   it('calls completion only after deletion succeeds and blocks repeat deletion', async () => {
