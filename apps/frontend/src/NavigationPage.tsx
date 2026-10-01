@@ -399,58 +399,7 @@ export function NavigationPage({ onBack }: NavigationPageProps) {
         console.warn('Backend /api/routes/driving unreachable, falling back to direct route computation:', err);
       }
 
-      // If backend was unreachable or returned empty, try direct Google Routes API fallback
-      if (calculatedDriveRoutes.length === 0) {
-        try {
-          const driveRes = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Goog-Api-Key': apiKey,
-              'X-Goog-FieldMask':
-                'routes.duration,routes.distanceMeters,routes.description,routes.polyline.encodedPolyline',
-            },
-            body: JSON.stringify({
-              origin: { location: { latLng: { latitude: originLocation.lat, longitude: originLocation.lng } } },
-              destination: { location: { latLng: { latitude: carparkLocation.lat, longitude: carparkLocation.lng } } },
-              travelMode: 'DRIVE',
-              computeAlternativeRoutes: true,
-            }),
-          });
-          const driveData = await driveRes.json();
-          if (driveData.routes && Array.isArray(driveData.routes) && driveData.routes.length > 0) {
-            interface RouteResponse {
-              duration?: string;
-              distanceMeters?: number;
-              description?: string;
-              polyline?: { encodedPolyline?: string };
-            }
-            calculatedDriveRoutes = driveData.routes.map((r: RouteResponse, idx: number) => {
-              const rawSec = parseInt((r.duration || '0s').replace('s', ''), 10);
-              const durationMin = Math.max(1, Math.round(rawSec / 60));
-              const distKm = parseFloat(((r.distanceMeters || 0) / 1000).toFixed(1));
-              let pathCoords: google.maps.LatLng[] | { lat: number; lng: number }[] = [
-                originLocation,
-                carparkLocation,
-              ];
-              if (r.polyline?.encodedPolyline && window.google?.maps?.geometry?.encoding) {
-                pathCoords = window.google.maps.geometry.encoding.decodePath(r.polyline.encodedPolyline);
-              }
-              return {
-                summary: r.description ? `via ${r.description}` : idx === 0 ? 'Primary Route' : 'Alternative Route',
-                durationMinutes: durationMin,
-                distanceKm: distKm,
-                traffic: (durationMin > 20 ? 'Moderate' : 'Light') as 'Moderate' | 'Light',
-                path: pathCoords,
-              };
-            });
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      // Final fallback driving calculation
+      // If backend was unreachable or returned empty, minimal safety fallback
       if (calculatedDriveRoutes.length === 0) {
         const estDist = parseFloat(
           calculateDistanceKm(originLocation.lat, originLocation.lng, carparkLocation.lat, carparkLocation.lng).toFixed(1)
@@ -464,24 +413,10 @@ export function NavigationPage({ onBack }: NavigationPageProps) {
             traffic: 'Moderate',
             path: [originLocation, carparkLocation],
           },
-          {
-            summary: 'Alternative Route',
-            durationMinutes: estDur + 3,
-            distanceKm: parseFloat((estDist * 1.15).toFixed(1)),
-            traffic: 'Light',
-            path: [
-              originLocation,
-              {
-                lat: (originLocation.lat + carparkLocation.lat) / 2 + 0.005,
-                lng: (originLocation.lng + carparkLocation.lng) / 2 + 0.005,
-              },
-              carparkLocation,
-            ],
-          },
         ];
       }
 
-      // B. Compute Walking Segment: query our Express backend first
+      // B. Compute Walking Segment: query our Express backend
       let calculatedWalk: WalkingInfo = {
         durationMinutes: 4,
         distanceMeters: 350,
@@ -510,16 +445,7 @@ export function NavigationPage({ onBack }: NavigationPageProps) {
           };
         }
       } catch (err) {
-        console.warn('Backend /api/routes/walking unreachable, falling back:', err);
-        const estWalkDistM = Math.round(
-          calculateDistanceKm(carparkLocation.lat, carparkLocation.lng, destinationLocation.lat, destinationLocation.lng) *
-            1000
-        );
-        calculatedWalk = {
-          durationMinutes: Math.max(1, Math.round(estWalkDistM / 75)),
-          distanceMeters: estWalkDistM,
-          path: [carparkLocation, destinationLocation],
-        };
+        console.warn('Backend /api/routes/walking unreachable:', err);
       }
 
       if (!isCancelled) {
@@ -552,7 +478,7 @@ export function NavigationPage({ onBack }: NavigationPageProps) {
     return () => {
       isCancelled = true;
     };
-  }, [originLocation, carparkLocation, destinationLocation, apiKey, apiBaseUrl]);
+  }, [originLocation, carparkLocation, destinationLocation, apiBaseUrl]);
 
   // 5. Real-time debounced search using Google Places API (New) with fallback
   useEffect(() => {

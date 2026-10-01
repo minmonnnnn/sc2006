@@ -188,3 +188,4 @@ export async function getWalkingRoute(
     durationMinutes: durationMin,
   };
 }
+
