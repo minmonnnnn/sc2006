@@ -60,7 +60,7 @@ describe('auth routes', () => {
       removeAuthUser: async (userId) => { removed.push(userId) },
     })
     await request(appWithGateway(authGateway)).post('/api/auth/register').send(registration).expect(503, {
-      error: { code: 'AUTH_UNAVAILABLE', message: 'Authentication service unavailable' },
+      error: { code: 'EXTERNAL_SERVICE_UNAVAILABLE', message: 'Authentication service unavailable' },
     })
     expect(removed).toEqual(['user-1'])
   })
@@ -77,11 +77,11 @@ describe('auth routes', () => {
     const credentials = { email: 'driver@example.com', password: 'WrongPassword1' }
     const badCredentials = gateway({ login: async () => { throw new AuthGatewayError('INVALID_CREDENTIALS') } })
     await request(appWithGateway(badCredentials)).post('/api/auth/login').send(credentials).expect(401, {
-      error: { code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' },
+      error: { code: 'UNAUTHORIZED', message: 'Invalid credentials' },
     })
     const unavailable = gateway({ login: async () => { throw new AuthGatewayError('UNAVAILABLE') } })
     await request(appWithGateway(unavailable)).post('/api/auth/login').send(credentials).expect(503, {
-      error: { code: 'AUTH_UNAVAILABLE', message: 'Authentication service unavailable' },
+      error: { code: 'EXTERNAL_SERVICE_UNAVAILABLE', message: 'Authentication service unavailable' },
     })
   })
 
@@ -157,6 +157,6 @@ describe('bearer authentication middleware', () => {
   it('maps token verification outages to 503', async () => {
     const authGateway = gateway({ verifyToken: async () => { throw new AuthGatewayError('UNAVAILABLE') } })
     await request(protectedApp(authGateway)).get('/api/users/me').set('Authorization', 'Bearer access-token')
-      .expect(503, { error: { code: 'AUTH_UNAVAILABLE', message: 'Authentication service unavailable' } })
+      .expect(503, { error: { code: 'EXTERNAL_SERVICE_UNAVAILABLE', message: 'Authentication service unavailable' } })
   })
 })

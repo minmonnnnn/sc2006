@@ -9,7 +9,7 @@ export interface FavouriteGateway {
 }
 
 function unavailable(): ApiException {
-  return new ApiException(503, 'FAVOURITES_UNAVAILABLE', 'Favourites service unavailable')
+  return new ApiException(503, 'EXTERNAL_SERVICE_UNAVAILABLE', 'Favourites service unavailable')
 }
 
 function notFound(): ApiException {

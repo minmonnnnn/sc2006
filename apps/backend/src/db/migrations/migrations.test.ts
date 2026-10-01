@@ -49,6 +49,7 @@ describe('database migrations', () => {
     const favouriteSql = readMigration('002_favourite_locations.sql')
     const sql = favouriteSql.toLowerCase()
 
+    expect(sql).toMatch(/favourite_id\s+serial\s+primary key/)
     expect(sql).toContain('references public.profiles(id) on delete cascade')
     expect(sql).toContain('unique (user_id, latitude, longitude)')
     expect(sql).toMatch(/latitude\s+between\s+-90\s+and\s+90/)

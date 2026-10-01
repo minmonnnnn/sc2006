@@ -3,7 +3,7 @@ import { ApiException } from '../../lib/api-error.js'
 import { AuthGatewayError, type AuthGateway } from './auth.types.js'
 
 function unavailable(): ApiException {
-  return new ApiException(503, 'AUTH_UNAVAILABLE', 'Authentication service unavailable')
+  return new ApiException(503, 'EXTERNAL_SERVICE_UNAVAILABLE', 'Authentication service unavailable')
 }
 
 export function createAuthService(gateway: AuthGateway) {
@@ -37,7 +37,7 @@ export function createAuthService(gateway: AuthGateway) {
         return await gateway.login(input)
       } catch (error) {
         if (error instanceof AuthGatewayError && error.kind === 'INVALID_CREDENTIALS') {
-          throw new ApiException(401, 'INVALID_CREDENTIALS', 'Invalid credentials')
+          throw new ApiException(401, 'UNAUTHORIZED', 'Invalid credentials')
         }
         throw unavailable()
       }
