@@ -100,7 +100,7 @@ describe('profile routes', () => {
       .set('Authorization', 'Bearer token')
     if (method === 'put') call.send({ name: 'Driver' })
     await call.expect(503, {
-      error: { code: 'AUTH_UNAVAILABLE', message: 'Authentication service unavailable' },
+      error: { code: 'EXTERNAL_SERVICE_UNAVAILABLE', message: 'Authentication service unavailable' },
     })
   })
 })

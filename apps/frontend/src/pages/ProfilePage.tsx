@@ -22,16 +22,18 @@ export function ProfilePage({ onAccountDeleted }: ProfilePageProps) {
   const deleteTriggerRef = useRef<HTMLButtonElement>(null)
   const cancelDeleteRef = useRef<HTMLButtonElement>(null)
   const confirmDeleteRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const restoreDeleteFocusRef = useRef(false)
 
   useEffect(() => {
     if (confirming) {
-      cancelDeleteRef.current?.focus()
+      if (deleting) dialogRef.current?.focus()
+      else cancelDeleteRef.current?.focus()
     } else if (restoreDeleteFocusRef.current) {
       restoreDeleteFocusRef.current = false
       deleteTriggerRef.current?.focus()
     }
-  }, [confirming])
+  }, [confirming, deleting])
 
   function startEditing() {
     if (!profile) return
@@ -89,6 +91,10 @@ export function ProfilePage({ onAccountDeleted }: ProfilePageProps) {
       closeConfirmation()
     }
     if (event.key !== 'Tab') return
+    if (deleting) {
+      event.preventDefault()
+      return
+    }
     if (event.shiftKey && document.activeElement === cancelDeleteRef.current) {
       event.preventDefault()
       confirmDeleteRef.current?.focus()
@@ -162,7 +168,7 @@ export function ProfilePage({ onAccountDeleted }: ProfilePageProps) {
     </section>
 
     {confirming && <div className="profile-modal-backdrop">
-      <div className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="delete-account-title" aria-describedby="delete-account-description" onKeyDown={handleDialogKeys}>
+      <div ref={dialogRef} tabIndex={-1} className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="delete-account-title" aria-describedby="delete-account-description" onKeyDown={handleDialogKeys}>
         <h2 id="delete-account-title">Delete your account?</h2>
         <p id="delete-account-description">Your profile and saved parking locations will be permanently removed. This cannot be undone.</p>
         {deleteError && <p className="auth-errors" role="alert">{deleteError}</p>}

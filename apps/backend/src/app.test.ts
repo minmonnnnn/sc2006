@@ -83,6 +83,12 @@ describe('createApp', () => {
       .expect(404, { error: { code: 'NOT_FOUND', message: 'Not found' } })
   })
 
+  it('rejects malformed JSON with a safe validation error', async () => {
+    await request(createApp(fakeDependencies)).post('/api/auth/login')
+      .set('Content-Type', 'application/json').send('{"password":"private-value"')
+      .expect(400, { error: { code: 'VALIDATION_ERROR', message: 'Invalid JSON body' } })
+  })
+
   it('serializes known exceptions with optional details', async () => {
     const auth = express.Router().get('/fail', () => {
       throw new ApiException(422, 'VALIDATION_ERROR', 'Invalid email', { field: 'email' })
@@ -101,6 +107,17 @@ describe('createApp', () => {
     const response = await request(createApp({ auth })).get('/api/auth/fail').expect(500)
     expect(response.body).toEqual({
       error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
+    })
+  })
+
+  it('omits optional exception details in production', async () => {
+    const auth = express.Router().get('/fail', () => {
+      throw new ApiException(400, 'VALIDATION_ERROR', 'Invalid input', { private: 'provider detail' })
+    })
+    const app = createApp({ auth })
+    app.set('env', 'production')
+    await request(app).get('/api/auth/fail').expect(400, {
+      error: { code: 'VALIDATION_ERROR', message: 'Invalid input' },
     })
   })
 })

@@ -96,4 +96,14 @@ describe('Supabase auth gateway', () => {
     await expect(gateway.createProfile('user-1', { name: 'Driver', vehicleType: 'EV' }))
       .rejects.toEqual(new AuthGatewayError('UNAVAILABLE'))
   })
+
+  it('rejects account deletion when the provider returns an error or throws', async () => {
+    for (const deleteUser of [
+      async () => ({ error: { message: 'private provider text' } }),
+      async () => { throw new Error('private network failure') },
+    ]) {
+      const gateway = createSupabaseAuthGateway({ adminClient: client({ deleteUser }), loginClient: client() })
+      await expect(gateway.removeAuthUser('user-1')).rejects.toEqual(new AuthGatewayError('UNAVAILABLE'))
+    }
+  })
 })

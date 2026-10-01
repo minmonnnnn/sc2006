@@ -2,6 +2,8 @@ import type { RequestHandler } from 'express'
 import { ApiException } from '../../lib/api-error.js'
 import type { AuthGateway } from './auth.types.js'
 
+// Mount with router.use(createRequireAuth(gateway)) before protected routes.
+// Successful verification sets request.auth.userId; never trust a body-supplied owner ID.
 export function createRequireAuth(gateway: AuthGateway): RequestHandler {
   return async (request, _response, next) => {
     const authorizationCount = request.rawHeaders.filter((header, index) =>
@@ -16,7 +18,7 @@ export function createRequireAuth(gateway: AuthGateway): RequestHandler {
     try {
       auth = await gateway.verifyToken(match[1]!)
     } catch {
-      throw new ApiException(503, 'AUTH_UNAVAILABLE', 'Authentication service unavailable')
+      throw new ApiException(503, 'EXTERNAL_SERVICE_UNAVAILABLE', 'Authentication service unavailable')
     }
     if (!auth) throw new ApiException(401, 'UNAUTHORIZED', 'Unauthorized')
     request.auth = auth

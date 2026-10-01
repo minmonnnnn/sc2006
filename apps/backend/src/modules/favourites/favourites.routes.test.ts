@@ -140,6 +140,6 @@ describe('favourite routes', () => {
     const client = authorized(app)
     const call = method === 'get' ? client.get() : method === 'post' ? client.post().send(input)
       : method === 'patch' ? client.patch('1').send({ locationName: 'New' }) : client.delete('1')
-    await call.expect(503, error('FAVOURITES_UNAVAILABLE', 'Favourites service unavailable'))
+    await call.expect(503, error('EXTERNAL_SERVICE_UNAVAILABLE', 'Favourites service unavailable'))
   })
 })
