@@ -692,15 +692,7 @@ export function NavigationPage({ onBack }: NavigationPageProps) {
 
   return (
     <div className={styles.phoneFrame}>
-      {/* 9:30 Status bar at the top */}
-      <div className={styles.statusBar}>
-        <span>9:30</span>
-        <div className={styles.statusIcons}>
-          <span>📶</span>
-          <span>5G</span>
-          <span>🔋</span>
-        </div>
-      </div>
+
 
       {/* Floating Top Actions Row (☰ on left, ... on right) */}
       <div className={styles.topHeaderRow}>
@@ -1010,20 +1002,7 @@ export function NavigationPage({ onBack }: NavigationPageProps) {
       </div>
 
       {/* Fixed Bottom Navigation Bar (Explore, Saved, Profile) */}
-      <nav className={styles.bottomNav}>
-        <div className={`${styles.navItem} ${styles.navItemActive}`}>
-          <span className={styles.navIcon}>✪</span>
-          <span>Explore</span>
-        </div>
-        <div className={styles.navItem}>
-          <span className={styles.navIcon}>✪</span>
-          <span>Saved</span>
-        </div>
-        <div className={styles.navItem}>
-          <span className={styles.navIcon}>✪</span>
-          <span>Profile</span>
-        </div>
-      </nav>
+    
     </div>
   );
 }
