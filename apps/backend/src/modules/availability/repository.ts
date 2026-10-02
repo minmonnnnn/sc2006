@@ -1,5 +1,5 @@
-import { getCachedAvailability } from "./availability.cache.js";
-import { buildAvailabilityInfo } from "./availability.service.js";
+import { buildAvailabilityInfo } from "./service.js";
+import { getCachedAvailability } from "./cache.js";
 
 export function getAvailabilityByCarParkNo(carParkNo: string) {
   const item = getCachedAvailability(carParkNo);

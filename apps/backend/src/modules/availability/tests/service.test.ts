@@ -3,7 +3,7 @@ import {
   getAvailabilityStatus,
   isAvailabilityStale,
   buildAvailabilityInfo,
-} from "./availability.service.js";
+} from "../service.js";
 
 describe("getAvailabilityStatus", () => {
   it("returns High when at least 50% of lots are available", () => {

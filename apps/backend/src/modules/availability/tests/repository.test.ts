@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { replaceAvailabilityCache } from "./availability.cache.js";
-import { getAvailabilityByCarParkNo } from "./availability.repository.js";
+import { replaceAvailabilityCache } from "../cache.js";
+import { getAvailabilityByCarParkNo } from "../repository.js";
 
 describe("getAvailabilityByCarParkNo", () => {
   it("returns availability for an existing carpark", () => {

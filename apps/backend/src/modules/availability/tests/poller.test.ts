@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchCarparkAvailability } from "./availability.api.js";
-import { startAvailabilityPoller } from "./availability.poller.js";
+import { fetchCarparkAvailability } from "../api.js";
+import { startAvailabilityPoller } from "../poller.js";
 
-vi.mock("./availability.api.js", () => ({
+vi.mock("../api.js", () => ({
   fetchCarparkAvailability: vi.fn(),
 }));
 
