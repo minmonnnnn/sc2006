@@ -1,7 +1,7 @@
 :root {
   font: 16px/1.45 system-ui, 'Segoe UI', sans-serif;
-  color: var(--auth-color-text, #111827);
-  background: #f8fafc;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
   color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
