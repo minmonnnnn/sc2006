@@ -16,10 +16,10 @@
   height: 760px;
   max-height: 96vh;
   margin: 12px auto;
-  border-radius: 40px;
+  /* border-radius: 40px; */
   overflow: hidden;
   position: relative;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.2), 0 0 0 10px #1E293B;
+  /* box-shadow: 0 20px 48px rgba(0, 0, 0, 0.2), 0 0 0 10px #1E293B; */
   background: #E5E7EB;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   box-sizing: border-box;
