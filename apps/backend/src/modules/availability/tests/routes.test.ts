@@ -1,8 +1,8 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
-import availabilityRouter from "./availability.routes.js";
-import { replaceAvailabilityCache } from "./availability.cache.js";
+import availabilityRouter from "../routes.js";
+import { replaceAvailabilityCache } from "../cache.js";
 
 const app = express();
 

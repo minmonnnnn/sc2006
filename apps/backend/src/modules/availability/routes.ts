@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getAvailabilityByCarParkNo } from "./availability.repository.js";
+import { getAvailabilityByCarParkNo } from "./repository.js";
 
 const router: Router = Router();
 

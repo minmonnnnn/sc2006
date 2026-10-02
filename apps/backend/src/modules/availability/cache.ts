@@ -1,4 +1,4 @@
-import type { RawAvailabilityRecord } from "./availability.api.js";
+import type { RawAvailabilityRecord } from "./api.js";
 
 const availabilityCache = new Map<string, RawAvailabilityRecord>();
 

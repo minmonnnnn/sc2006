@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fetchCarparkAvailability } from "./availability.api.js";
+import { fetchCarparkAvailability } from "../api.js";
 
 describe("fetchCarparkAvailability", () => {
   it("fetches and transforms carpark availability data", async () => {
