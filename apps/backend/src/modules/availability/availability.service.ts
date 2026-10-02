@@ -31,7 +31,9 @@ export function getAvailabilityStatus(
 
 export function isAvailabilityStale(
   fetchedAt: Date,
-  staleAfterMinutes = 5,
+  // availability considered stale after 3min to allow for
+  // tolerance for delayed or failed 1-minute refreshes :)
+  staleAfterMinutes = 3,
 ): boolean {
   const now = new Date();
 

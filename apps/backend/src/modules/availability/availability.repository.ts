@@ -1,21 +1,8 @@
 import { buildAvailabilityInfo } from "./availability.service.js";
-import { fakeAvailabilityData } from "./availability.fixture.js";
-
-export function getAllAvailability() {
-  return fakeAvailabilityData.map((item) => ({
-    carParkNo: item.carParkNo,
-    ...buildAvailabilityInfo(
-      item.availableLots,
-      item.totalLots,
-      item.fetchedAt,
-    ),
-  }));
-}
+import { getCachedAvailability } from "./availability.cache.js";
 
 export function getAvailabilityByCarParkNo(carParkNo: string) {
-  const item = fakeAvailabilityData.find(
-    (entry) => entry.carParkNo === carParkNo,
-  );
+  const item = getCachedAvailability(carParkNo);
 
   if (!item) {
     return null;
@@ -30,5 +17,3 @@ export function getAvailabilityByCarParkNo(carParkNo: string) {
     ),
   };
 }
-
-getAvailabilityByCarParkNo("AK19");

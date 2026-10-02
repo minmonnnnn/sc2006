@@ -1,26 +1,19 @@
-export const fakeAvailabilityData = [
-  {
-    carParkNo: "AK19",
-    availableLots: 60,
-    totalLots: 100,
-    fetchedAt: new Date(),
-  },
-  {
-    carParkNo: "BK25",
-    availableLots: 25,
-    totalLots: 100,
-    fetchedAt: new Date(),
-  },
-  {
-    carParkNo: "CK30",
-    availableLots: 8,
-    totalLots: 100,
-    fetchedAt: new Date(),
-  },
-  {
-    carParkNo: "DK40",
-    availableLots: 0,
-    totalLots: 100,
-    fetchedAt: new Date(),
-  },
-];
+import { getCachedAvailability } from "./availability.cache.js";
+import { buildAvailabilityInfo } from "./availability.service.js";
+
+export function getAvailabilityByCarParkNo(carParkNo: string) {
+  const item = getCachedAvailability(carParkNo);
+
+  if (!item) {
+    return null;
+  }
+
+  return {
+    carParkNo: item.carParkNo,
+    ...buildAvailabilityInfo(
+      item.availableLots,
+      item.totalLots,
+      item.fetchedAt,
+    ),
+  };
+}
