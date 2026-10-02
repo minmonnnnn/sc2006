@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
+import { replaceAvailabilityCache } from "./availability.cache.js";
 import { getAvailabilityByCarParkNo } from "./availability.repository.js";
 
 describe("getAvailabilityByCarParkNo", () => {
   it("returns availability for an existing carpark", () => {
+    replaceAvailabilityCache([
+      {
+        carParkNo: "AK19",
+        availableLots: 60,
+        totalLots: 100,
+        fetchedAt: new Date(),
+      },
+    ]);
+
     const result = getAvailabilityByCarParkNo("AK19");
 
     expect(result).not.toBeNull();
@@ -10,11 +20,11 @@ describe("getAvailabilityByCarParkNo", () => {
     expect(result?.status).toBe("High");
   });
 
-  it("returns null for a carpark that does not exist", () => {
+  it("returns null for an unknown carpark", () => {
+    replaceAvailabilityCache([]);
+
     const result = getAvailabilityByCarParkNo("ZZ99");
 
     expect(result).toBeNull();
   });
 });
-
-// okconsole.log(getAvailabilityByCarParkNo("AK19"));

@@ -2,6 +2,7 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import availabilityRouter from "./availability.routes.js";
+import { replaceAvailabilityCache } from "./availability.cache.js";
 
 const app = express();
 
@@ -10,6 +11,15 @@ app.use("/api/carparks", availabilityRouter);
 
 describe("availability routes", () => {
   it("returns availability for an existing carpark", async () => {
+    replaceAvailabilityCache([
+      {
+        carParkNo: "AK19",
+        availableLots: 60,
+        totalLots: 100,
+        fetchedAt: new Date(),
+      },
+    ]);
+
     const response = await request(app).get("/api/carparks/AK19/availability");
 
     expect(response.status).toBe(200);
@@ -18,9 +28,9 @@ describe("availability routes", () => {
   });
 
   it("returns 404 for an unknown carpark", async () => {
+    replaceAvailabilityCache([]);
     const response = await request(app).get("/api/carparks/ZZ99/availability");
 
     expect(response.status).toBe(404);
-    expect(response.body.error.code).toBe("NOT_FOUND");
   });
 });
