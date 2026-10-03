@@ -12,7 +12,7 @@ All responses use the shared `ApiError` shape (see `packages/shared-types/src/ap
 Registers a user via Supabase Auth and creates a matching `profiles` row.
 - **Request:** `{ email: string; password: string; name: string; vehicleType: "EV" | "Petrol" | "Hybrid" }`
 - **Response 201:** `{ userId: string; email: string; name: string }`
-- **Errors:** `VALIDATION_ERROR`, `409 ACCOUNT_ALREADY_EXISTS`
+- **Errors:** `VALIDATION_ERROR`, `ACCOUNT_ALREADY_EXISTS (409)`
 - **FR:** FR1
 
 ### `POST /api/auth/login`
@@ -47,7 +47,7 @@ Deletes the account and associated personal data.
 ### `POST /api/favourites`
 - **Request:** `{ locationName: string; address: string; latitude: number; longitude: number }`
 - **Response 201:** `FavouriteLocation`
-- **Errors:** `409` if an identical location is already saved (UC-10.AC.2)
+- **Errors:** `FAVOURITE_ALREADY_EXISTS (409)` if an identical location is already saved (UC-10.AC.2)
 - **FR:** FR35
 
 ### `PATCH /api/favourites/:id`
@@ -160,3 +160,4 @@ Record changes here as they happen, so everyone can see what shifted since they 
 | Date | Change | Author | Approved by |
 |---|---|---|---|
 | _(repo bootstrap date)_ | Initial contract drafted from SRS | Min | Whole team |
+| 2026-10-02 | Added ApiError/ApiErrorCode to shared-types; added ACCOUNT_ALREADY_EXISTS, FAVOURITE_ALREADY_EXISTS | Nigel | Pending |
