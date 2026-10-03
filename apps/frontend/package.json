@@ -12,6 +12,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@react-google-maps/api": "^2.20.8",
     "@smart-parking/shared-types": "workspace:*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

@@ -65,8 +65,8 @@ export const theme = {
   },
   layout: {
     // SRS mobile portrait baseline
-    viewportWidth: '360px',
-    viewportHeight: '780px',
+    viewportWidth: '480px',
+    viewportHeight: '960px',
     gutter: '16px',
   },
 } as const
