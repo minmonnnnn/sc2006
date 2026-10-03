@@ -34,6 +34,6 @@ describe('theme', () => {
     const root = document.createElement('div')
     applyTheme(root)
     expect(root.style.getPropertyValue('--color-success')).toBe('#10B981')
-    expect(root.style.getPropertyValue('--layout-viewport-width')).toBe('360px')
+    expect(root.style.getPropertyValue('--layout-viewport-width')).toBe('480px')
   })
 })
