@@ -2,7 +2,7 @@ import express from 'express'
 import request from 'supertest'
 import { describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
-import { ApiException } from './lib/api-error.js'
+import { ApiException } from './lib/errors/index.js'
 
 const fakeDependencies = {}
 

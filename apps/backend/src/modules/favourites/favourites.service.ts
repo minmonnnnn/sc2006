@@ -1,5 +1,5 @@
 import type { CreateFavouriteRequest, FavouriteLocation, RenameFavouriteRequest } from '@smart-parking/shared-types'
-import { ApiException } from '../../lib/api-error.js'
+import { ApiException } from '../../lib/errors/index.js'
 
 export interface FavouriteGateway {
   list(userId: string): Promise<FavouriteLocation[]>

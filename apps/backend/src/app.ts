@@ -1,6 +1,6 @@
 import express, { type Express, type Router } from 'express'
 import cors from 'cors'
-import { ApiException, errorHandler } from './lib/api-error.js'
+import { ApiException, errorHandler } from './lib/errors/index.js'
 
 export interface AppDependencies {
   frontendOrigin?: string

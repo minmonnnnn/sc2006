@@ -1,5 +1,5 @@
 import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse, UpdateProfileRequest, User } from '@smart-parking/shared-types'
-import { ApiException } from '../../lib/api-error.js'
+import { ApiException } from '../../lib/errors/index.js'
 import { AuthGatewayError, type AuthGateway } from './auth.types.js'
 
 function unavailable(): ApiException {

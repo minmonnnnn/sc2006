@@ -1,5 +1,5 @@
 import type { CreateFavouriteRequest, RenameFavouriteRequest } from '@smart-parking/shared-types'
-import { ApiException } from '../../lib/api-error.js'
+import { ApiException } from '../../lib/errors/index.js'
 
 function invalid(message: string): never {
   throw new ApiException(400, 'VALIDATION_ERROR', message)

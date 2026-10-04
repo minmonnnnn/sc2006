@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ApiException } from '../../lib/api-error.js'
+import { ApiException } from '../../lib/errors/index.js'
 import {
   parseLoginRequest,
   parseRegisterRequest,

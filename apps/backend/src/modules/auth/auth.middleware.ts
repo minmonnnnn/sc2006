@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express'
-import { ApiException } from '../../lib/api-error.js'
+import { ApiException } from '../../lib/errors/index.js'
 import type { AuthGateway } from './auth.types.js'
 
 // Mount with router.use(createRequireAuth(gateway)) before protected routes.
