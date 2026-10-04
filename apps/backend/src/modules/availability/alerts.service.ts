@@ -1,12 +1,22 @@
 import type { AvailabilityStatus } from "./service.js";
-
 import { getAvailabilityByCarParkNo } from "./repository.js";
-
 import {
   getEnabledAlerts,
   updateAlertLastKnownStatus,
 } from "./alerts.repository.js";
 
+export interface AvailabilityNotification {
+  alertId: number;
+  carParkNo: string;
+  previousStatus: AvailabilityStatus;
+  currentStatus: AvailabilityStatus;
+}
+
+export type SendAvailabilityNotification = (
+  notification: AvailabilityNotification,
+) => Promise<void>;
+
+/** A significant change is a change between availability tiers. */
 export function hasSignificantAvailabilityChange(
   previousStatus: AvailabilityStatus,
   currentStatus: AvailabilityStatus,
@@ -14,31 +24,38 @@ export function hasSignificantAvailabilityChange(
   return previousStatus !== currentStatus;
 }
 
-export function checkAvailabilityAlerts(): void {
-  const enabledAlerts = getEnabledAlerts();
-
-  for (const alert of enabledAlerts) {
+export async function checkAvailabilityAlerts(
+  sendNotification: SendAvailabilityNotification,
+): Promise<void> {
+  for (const alert of getEnabledAlerts()) {
     const availability = getAvailabilityByCarParkNo(alert.carParkNo);
 
-    if (!availability) {
+    if (!availability || availability.isStale) {
       continue;
     }
 
-    const previousStatus = alert.lastKnownStatus;
-
-    const changed = hasSignificantAvailabilityChange(
-      previousStatus,
-      availability.status,
-    );
-
-    if (!changed) {
+    if (
+      !hasSignificantAvailabilityChange(
+        alert.lastKnownStatus,
+        availability.status,
+      )
+    ) {
       continue;
     }
 
-    updateAlertLastKnownStatus(alert.id, availability.status);
+    try {
+      await sendNotification({
+        alertId: alert.id,
+        carParkNo: alert.carParkNo,
+        previousStatus: alert.lastKnownStatus,
+        currentStatus: availability.status,
+      });
 
-    console.log(
-      `Availability alert: ${alert.carParkNo} changed from ${previousStatus} to ${availability.status}`,
-    );
+      // Update only after successful delivery.
+      updateAlertLastKnownStatus(alert.id, availability.status);
+    } catch (error) {
+      // Preserve the previous status so delivery can be retried.
+      console.error(`Failed to send availability alert ${alert.id}:`, error);
+    }
   }
 }

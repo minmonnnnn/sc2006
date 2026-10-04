@@ -12,6 +12,16 @@ vi.mock("../alerts.service.js", () => ({
   checkAvailabilityAlerts: vi.fn(),
 }));
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+}
+
 describe("startAvailabilityPoller", () => {
   let stopPoller: (() => void) | undefined;
 
@@ -29,6 +39,7 @@ describe("startAvailabilityPoller", () => {
     replaceAvailabilityCache([]);
 
     vi.mocked(fetchCarparkAvailability).mockResolvedValue([record]);
+    vi.mocked(checkAvailabilityAlerts).mockResolvedValue(undefined);
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -44,7 +55,7 @@ describe("startAvailabilityPoller", () => {
   });
 
   it("fetches immediately and updates the cache", async () => {
-    stopPoller = startAvailabilityPoller();
+    stopPoller = startAvailabilityPoller(vi.fn().mockResolvedValue(undefined));
 
     await vi.advanceTimersByTimeAsync(0);
 
@@ -54,7 +65,7 @@ describe("startAvailabilityPoller", () => {
   });
 
   it("refreshes every minute", async () => {
-    stopPoller = startAvailabilityPoller();
+    stopPoller = startAvailabilityPoller(vi.fn().mockResolvedValue(undefined));
 
     await vi.advanceTimersByTimeAsync(0);
 
@@ -69,7 +80,7 @@ describe("startAvailabilityPoller", () => {
   });
 
   it("stops future refreshes when stopped", async () => {
-    stopPoller = startAvailabilityPoller();
+    stopPoller = startAvailabilityPoller(vi.fn().mockResolvedValue(undefined));
 
     await vi.advanceTimersByTimeAsync(0);
 
@@ -87,7 +98,7 @@ describe("startAvailabilityPoller", () => {
       new Error("Service unavailable"),
     );
 
-    stopPoller = startAvailabilityPoller();
+    stopPoller = startAvailabilityPoller(vi.fn().mockResolvedValue(undefined));
 
     await vi.advanceTimersByTimeAsync(0);
 
@@ -101,7 +112,7 @@ describe("startAvailabilityPoller", () => {
       .mockRejectedValueOnce(new Error("Service unavailable"))
       .mockResolvedValueOnce([record]);
 
-    stopPoller = startAvailabilityPoller();
+    stopPoller = startAvailabilityPoller(vi.fn().mockResolvedValue(undefined));
 
     await vi.advanceTimersByTimeAsync(0);
     expect(getCachedAvailability("AK19")).toBeNull();
@@ -111,5 +122,75 @@ describe("startAvailabilityPoller", () => {
     expect(fetchCarparkAvailability).toHaveBeenCalledTimes(2);
     expect(getCachedAvailability("AK19")).toEqual(record);
     expect(checkAvailabilityAlerts).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not overlap requests while fetching", async () => {
+    const pending =
+      deferred<Awaited<ReturnType<typeof fetchCarparkAvailability>>>();
+
+    vi.mocked(fetchCarparkAvailability).mockReturnValueOnce(pending.promise);
+
+    stopPoller = startAvailabilityPoller(vi.fn().mockResolvedValue(undefined));
+
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(fetchCarparkAvailability).toHaveBeenCalledTimes(1);
+
+    pending.resolve([record]);
+    await vi.advanceTimersByTimeAsync(0);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(fetchCarparkAvailability).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not overlap refreshes while checking alerts", async () => {
+    const pending = deferred<void>();
+
+    vi.mocked(checkAvailabilityAlerts).mockReturnValueOnce(pending.promise);
+
+    const sender = vi.fn().mockResolvedValue(undefined);
+    stopPoller = startAvailabilityPoller(sender);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(checkAvailabilityAlerts).toHaveBeenCalledWith(sender);
+
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(fetchCarparkAvailability).toHaveBeenCalledTimes(1);
+
+    pending.resolve(undefined);
+    await vi.advanceTimersByTimeAsync(0);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(fetchCarparkAvailability).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not update the cache if stopped during fetching", async () => {
+    const pending =
+      deferred<Awaited<ReturnType<typeof fetchCarparkAvailability>>>();
+
+    vi.mocked(fetchCarparkAvailability).mockReturnValueOnce(pending.promise);
+
+    stopPoller = startAvailabilityPoller(vi.fn().mockResolvedValue(undefined));
+
+    stopPoller();
+
+    pending.resolve([record]);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(getCachedAvailability("AK19")).toBeNull();
+    expect(checkAvailabilityAlerts).not.toHaveBeenCalled();
+  });
+
+  it("refreshes availability without a configured notification sender", async () => {
+    stopPoller = startAvailabilityPoller();
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(getCachedAvailability("AK19")).toEqual(record);
+    expect(checkAvailabilityAlerts).not.toHaveBeenCalled();
   });
 });

@@ -4,20 +4,27 @@ import { getAvailabilityByCarParkNo } from "./repository.js";
 
 const router: Router = Router();
 
-router.post("/", (req, res) => {
-  const { carParkNo } = req.body as {
-    carParkNo?: unknown;
-  };
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
-  if (typeof carParkNo !== "string" || carParkNo.trim() === "") {
+router.post("/", (req, res) => {
+  const body: unknown = req.body;
+
+  if (
+    !isObject(body) ||
+    typeof body.carParkNo !== "string" ||
+    body.carParkNo.trim() === ""
+  ) {
     return res.status(400).json({
       error: {
-        code: "BAD_REQUEST",
-        message: "carParkNo must be provided",
+        code: "VALIDATION_ERROR",
+        message: "carParkNo must be a non-empty string",
       },
     });
   }
 
+  const carParkNo = body.carParkNo.trim();
   const availability = getAvailabilityByCarParkNo(carParkNo);
 
   if (!availability) {
@@ -39,22 +46,25 @@ router.post("/", (req, res) => {
 });
 
 router.patch("/:id", (req, res) => {
-  const id = Number(req.params.id);
+  const rawId = req.params.id;
+  const id = Number(rawId);
+  const body: unknown = req.body;
 
-  const { enabled } = req.body as {
-    enabled?: unknown;
-  };
-
-  if (!Number.isInteger(id) || typeof enabled !== "boolean") {
+  if (
+    !/^[1-9]\d*$/.test(rawId) ||
+    !Number.isSafeInteger(id) ||
+    !isObject(body) ||
+    typeof body.enabled !== "boolean"
+  ) {
     return res.status(400).json({
       error: {
-        code: "BAD_REQUEST",
-        message: "Valid alert id and enabled value are required",
+        code: "VALIDATION_ERROR",
+        message: "A positive integer alert id and boolean enabled are required",
       },
     });
   }
 
-  const alert = setAlertEnabled(id, enabled);
+  const alert = setAlertEnabled(id, body.enabled);
 
   if (!alert) {
     return res.status(404).json({

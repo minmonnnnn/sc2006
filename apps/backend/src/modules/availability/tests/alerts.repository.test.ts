@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createAlert, setAlertEnabled } from "../alerts.repository.js";
+import {
+  createAlert,
+  setAlertEnabled,
+  getEnabledAlerts,
+} from "../alerts.repository.js";
 
 describe("availability alert repository", () => {
   it("creates an enabled alert", () => {
@@ -23,5 +27,28 @@ describe("availability alert repository", () => {
     const updated = setAlertEnabled(99999, false);
 
     expect(updated).toBeNull();
+  });
+
+  it("excludes disabled alerts and includes them again when re-enabled", () => {
+    const alert = createAlert("DISABLED_TEST", "High");
+
+    expect(getEnabledAlerts()).toContainEqual(
+      expect.objectContaining({ id: alert.id }),
+    );
+
+    setAlertEnabled(alert.id, false);
+
+    expect(getEnabledAlerts()).not.toContainEqual(
+      expect.objectContaining({ id: alert.id }),
+    );
+
+    setAlertEnabled(alert.id, true);
+
+    expect(getEnabledAlerts()).toContainEqual(
+      expect.objectContaining({ id: alert.id }),
+    );
+
+    // Leave this test's record disabled.
+    setAlertEnabled(alert.id, false);
   });
 });
