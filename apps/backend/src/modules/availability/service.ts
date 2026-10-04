@@ -8,6 +8,12 @@ export interface AvailabilityInfo {
   isStale: boolean;
 }
 
+/**
+ * High: at least 50% of lots available.
+ * Moderate: at least 20%, but below 50%.
+ * Low: above 0%, but below 20%.
+ * Unavailable: no available lots or non-positive capacity.
+ */
 export function getAvailabilityStatus(
   availableLots: number,
   totalLots: number,
@@ -29,10 +35,14 @@ export function getAvailabilityStatus(
   return "Low";
 }
 
+/**
+ * Data is stale when its source timestamp is more than
+ * three minutes old. Exactly three minutes is still fresh.
+ * Availability considered stale after 3min to allow for
+ * tolerance for delayed or failed 1-minute refreshes :)
+ */
 export function isAvailabilityStale(
   fetchedAt: Date,
-  // availability considered stale after 3min to allow for
-  // tolerance for delayed or failed 1-minute refreshes :)
   staleAfterMinutes = 3,
 ): boolean {
   const now = new Date();
