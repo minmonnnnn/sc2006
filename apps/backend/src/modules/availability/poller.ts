@@ -4,12 +4,18 @@ import {
   checkAvailabilityAlerts,
   type SendAvailabilityNotification,
 } from "./alerts.service.js";
+import { createAvailabilityFetcher, type LtaSourceOptions } from "./sources.js";
 
 const POLL_INTERVAL_MS = 60 * 1000;
 
 export function startAvailabilityPoller(
   sendNotification?: SendAvailabilityNotification,
+  lta?: LtaSourceOptions,
 ): () => void {
+  const fetchLatest = lta
+    ? createAvailabilityFetcher(lta)
+    : fetchCarparkAvailability;
+
   let running = false;
   let stopped = false;
 
@@ -19,7 +25,7 @@ export function startAvailabilityPoller(
     running = true;
 
     try {
-      const latestData = await fetchCarparkAvailability();
+      const latestData = await fetchLatest();
 
       if (stopped) return;
 
