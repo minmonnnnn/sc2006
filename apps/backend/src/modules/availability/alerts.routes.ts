@@ -2,84 +2,154 @@ import { Router } from "express";
 import { createAlert, setAlertEnabled } from "./alerts.repository.js";
 import { getAvailabilityByCarParkNo } from "./repository.js";
 
-const router: Router = Router();
+export type VerifyAlertToken = (
+  token: string,
+) => Promise<{ userId: string } | null>;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-router.post("/", (req, res) => {
-  const body: unknown = req.body;
+export function createAlertRouter(verifyToken: VerifyAlertToken): Router {
+  const router: Router = Router();
 
-  if (
-    !isObject(body) ||
-    typeof body.carParkNo !== "string" ||
-    body.carParkNo.trim() === ""
-  ) {
-    return res.status(400).json({
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "carParkNo must be a non-empty string",
-      },
-    });
-  }
+  router.use(async (req, res, next) => {
+    const authorizationCount = req.rawHeaders.filter(
+      (header, index) =>
+        index % 2 === 0 && header.toLowerCase() === "authorization",
+    ).length;
 
-  const carParkNo = body.carParkNo.trim();
-  const availability = getAvailabilityByCarParkNo(carParkNo);
+    const match = /^Bearer ([^\s,]+)$/i.exec(req.headers.authorization ?? "");
 
-  if (!availability) {
-    return res.status(404).json({
-      error: {
-        code: "NOT_FOUND",
-        message: "Carpark availability not found",
-      },
-    });
-  }
+    if (authorizationCount !== 1 || !match) {
+      return res.status(401).json({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Sign in to manage availability alerts",
+        },
+      });
+    }
 
-  const alert = createAlert(carParkNo, availability.status);
+    let user: { userId: string } | null;
 
-  return res.status(201).json({
-    alertId: String(alert.id),
-    carParkNo: alert.carParkNo,
-    enabled: alert.enabled,
+    try {
+      user = await verifyToken(match[1]!);
+    } catch {
+      return res.status(503).json({
+        error: {
+          code: "EXTERNAL_SERVICE_UNAVAILABLE",
+          message: "Authentication service unavailable",
+        },
+      });
+    }
+
+    if (!user || !user.userId) {
+      return res.status(401).json({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Sign in to manage availability alerts",
+        },
+      });
+    }
+
+    res.locals.alertUserId = user.userId;
+    next();
   });
-});
 
-router.patch("/:id", (req, res) => {
-  const rawId = req.params.id;
-  const id = Number(rawId);
-  const body: unknown = req.body;
+  router.post("/", (req, res) => {
+    const userId: unknown = res.locals.alertUserId;
+    const body: unknown = req.body;
 
-  if (
-    !/^[1-9]\d*$/.test(rawId) ||
-    !Number.isSafeInteger(id) ||
-    !isObject(body) ||
-    typeof body.enabled !== "boolean"
-  ) {
-    return res.status(400).json({
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "A positive integer alert id and boolean enabled are required",
-      },
+    if (typeof userId !== "string") {
+      return res.status(401).json({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Sign in to manage availability alerts",
+        },
+      });
+    }
+
+    if (
+      !isObject(body) ||
+      typeof body.carParkNo !== "string" ||
+      body.carParkNo.trim() === ""
+    ) {
+      return res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "carParkNo must be a non-empty string",
+        },
+      });
+    }
+
+    const carParkNo = body.carParkNo.trim();
+    const availability = getAvailabilityByCarParkNo(carParkNo);
+
+    if (!availability) {
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Carpark availability not found",
+        },
+      });
+    }
+
+    const alert = createAlert(userId, carParkNo, availability.status);
+
+    return res.status(201).json({
+      alertId: String(alert.id),
+      carParkNo: alert.carParkNo,
+      enabled: alert.enabled,
     });
-  }
-
-  const alert = setAlertEnabled(id, body.enabled);
-
-  if (!alert) {
-    return res.status(404).json({
-      error: {
-        code: "NOT_FOUND",
-        message: "Alert not found",
-      },
-    });
-  }
-
-  return res.status(200).json({
-    alertId: String(alert.id),
-    carParkNo: alert.carParkNo,
-    enabled: alert.enabled,
   });
-});
 
-export default router;
+  router.patch("/:id", (req, res) => {
+    const userId: unknown = res.locals.alertUserId;
+    const rawId = req.params.id;
+    const id = Number(rawId);
+    const body: unknown = req.body;
+
+    if (typeof userId !== "string") {
+      return res.status(401).json({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Sign in to manage availability alerts",
+        },
+      });
+    }
+
+    if (
+      !/^[1-9]\d*$/.test(rawId) ||
+      !Number.isSafeInteger(id) ||
+      !isObject(body) ||
+      typeof body.enabled !== "boolean"
+    ) {
+      return res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message:
+            "A positive integer alert id and boolean enabled are required",
+        },
+      });
+    }
+
+    const alert = setAlertEnabled(id, userId, body.enabled);
+
+    if (!alert) {
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Alert not found",
+        },
+      });
+    }
+
+    return res.status(200).json({
+      alertId: String(alert.id),
+      carParkNo: alert.carParkNo,
+      enabled: alert.enabled,
+    });
+  });
+
+  return router;
+}

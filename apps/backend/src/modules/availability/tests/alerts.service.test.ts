@@ -39,6 +39,7 @@ describe("availability alert checks", () => {
 
     alert = {
       id: 1,
+      userId: "user-1",
       carParkNo: "AK19",
       enabled: true,
       lastKnownStatus: "High",
@@ -70,11 +71,12 @@ describe("availability alert checks", () => {
     expect(hasSignificantAvailabilityChange("High", "High")).toBe(false);
   });
 
-  it("sends a notification and updates the baseline", async () => {
+  it("notifies the owner and updates the baseline", async () => {
     await checkAvailabilityAlerts(sendNotification);
 
     expect(sendNotification).toHaveBeenCalledExactlyOnceWith({
       alertId: 1,
+      userId: "user-1",
       carParkNo: "AK19",
       previousStatus: "High",
       currentStatus: "Moderate",
@@ -151,6 +153,7 @@ describe("availability alert checks", () => {
       {
         ...alert,
         id: 2,
+        userId: "user-2",
         carParkNo: "BK25",
       },
     ]);
@@ -160,6 +163,13 @@ describe("availability alert checks", () => {
     await checkAvailabilityAlerts(sendNotification);
 
     expect(sendNotification).toHaveBeenCalledTimes(2);
+    expect(sendNotification).toHaveBeenNthCalledWith(2, {
+      alertId: 2,
+      userId: "user-2",
+      carParkNo: "BK25",
+      previousStatus: "High",
+      currentStatus: "Moderate",
+    });
 
     expect(updateAlertLastKnownStatus).toHaveBeenCalledTimes(1);
     expect(updateAlertLastKnownStatus).toHaveBeenCalledWith(2, "Moderate");

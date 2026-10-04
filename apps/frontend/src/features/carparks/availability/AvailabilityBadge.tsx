@@ -22,23 +22,11 @@ export function AvailabilityBadge({
         {availableLots} / {totalLots} lots available
       </div>
 
-      <div
-        style={{
-          width: "200px",
-          height: "10px",
-          backgroundColor: "#ddd",
-          borderRadius: "5px",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: `${percentage}%`,
-            height: "100%",
-            backgroundColor: "#666",
-          }}
-        />
-      </div>
+      <progress
+        aria-label="Available parking spaces"
+        max={100}
+        value={percentage}
+      />
 
       {isStale && <small>Availability data may be outdated</small>}
     </div>

@@ -7,6 +7,7 @@ import {
 
 export interface AvailabilityNotification {
   alertId: number;
+  userId: string;
   carParkNo: string;
   previousStatus: AvailabilityStatus;
   currentStatus: AvailabilityStatus;
@@ -46,15 +47,14 @@ export async function checkAvailabilityAlerts(
     try {
       await sendNotification({
         alertId: alert.id,
+        userId: alert.userId,
         carParkNo: alert.carParkNo,
         previousStatus: alert.lastKnownStatus,
         currentStatus: availability.status,
       });
 
-      // Update only after successful delivery.
       updateAlertLastKnownStatus(alert.id, availability.status);
     } catch (error) {
-      // Preserve the previous status so delivery can be retried.
       console.error(`Failed to send availability alert ${alert.id}:`, error);
     }
   }

@@ -60,4 +60,39 @@ describe("AvailabilityBadge", () => {
     expect(screen.getByText("Unavailable")).toBeTruthy();
     expect(screen.getByText("0 / 100 lots available")).toBeTruthy();
   });
+
+  it("exposes availability through an accessible progress bar", () => {
+    render(
+      <AvailabilityBadge
+        availableLots={60}
+        totalLots={100}
+        status="High"
+        isStale={false}
+      />,
+    );
+
+    const progress = screen.getByRole("progressbar", {
+      name: "Available parking spaces",
+    }) as HTMLProgressElement;
+
+    expect(progress.value).toBe(60);
+    expect(progress.max).toBe(100);
+  });
+
+  it("handles zero capacity without an invalid percentage", () => {
+    render(
+      <AvailabilityBadge
+        availableLots={0}
+        totalLots={0}
+        status="Unavailable"
+        isStale={false}
+      />,
+    );
+
+    const progress = screen.getByRole("progressbar", {
+      name: "Available parking spaces",
+    }) as HTMLProgressElement;
+
+    expect(progress.value).toBe(0);
+  });
 });
