@@ -47,17 +47,31 @@ export async function fetchCarparkAvailability(): Promise<
   }
 
   return carparks.flatMap((carpark): RawAvailabilityRecord[] => {
-    const carInfo = carpark.carpark_info[0];
+    const carInfo = carpark.carpark_info.find((info) => info.lot_type === "C");
 
     if (!carInfo) {
       return [];
     }
 
-    const availableLots = Number(carInfo.lots_available);
+    const availableText = carInfo.lots_available.trim();
+    const totalText = carInfo.total_lots.trim();
 
-    const totalLots = Number(carInfo.total_lots);
+    if (availableText === "" || totalText === "") {
+      return [];
+    }
 
-    if (Number.isNaN(availableLots) || Number.isNaN(totalLots)) {
+    const availableLots = Number(availableText);
+    const totalLots = Number(totalText);
+    const fetchedAt = new Date(carpark.update_datetime);
+
+    if (
+      !Number.isInteger(availableLots) ||
+      !Number.isInteger(totalLots) ||
+      availableLots < 0 ||
+      totalLots < 0 ||
+      availableLots > totalLots ||
+      Number.isNaN(fetchedAt.getTime())
+    ) {
       return [];
     }
 
@@ -66,7 +80,7 @@ export async function fetchCarparkAvailability(): Promise<
         carParkNo: carpark.carpark_number,
         availableLots,
         totalLots,
-        fetchedAt: new Date(carpark.update_datetime),
+        fetchedAt,
       },
     ];
   });
