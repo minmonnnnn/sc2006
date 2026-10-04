@@ -23,7 +23,8 @@ describe("availability routes", () => {
     const response = await request(app).get("/api/carparks/AK19/availability");
 
     expect(response.status).toBe(200);
-    expect(response.body.carParkNo).toBe("AK19");
+    expect(response.body.availableLots).toBe(60);
+    expect(response.body.totalLots).toBe(100);
     expect(response.body.status).toBe("High");
   });
 

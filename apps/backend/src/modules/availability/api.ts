@@ -17,35 +17,57 @@ interface DataGovCarpark {
   update_datetime: string;
 }
 
+interface DataGovItem {
+  timestamp: string;
+  carpark_data: DataGovCarpark[];
+}
+
+interface DataGovResponse {
+  items: DataGovItem[];
+}
+
+const AVAILABILITY_API_URL =
+  "https://api.data.gov.sg/v1/transport/carpark-availability";
+
 export async function fetchCarparkAvailability(): Promise<
   RawAvailabilityRecord[]
 > {
-  const response = await fetch(
-    "https://api.data.gov.sg/v1/transport/carpark-availability",
-  );
+  const response = await fetch(AVAILABILITY_API_URL);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch carpark availability: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as DataGovResponse;
 
-  const carparks = data.items[0].carpark_data;
+  const carparks = data.items[0]?.carpark_data;
 
-  return carparks.map((carpark: DataGovCarpark) => {
+  if (!carparks) {
+    throw new Error("Invalid response from carpark availability API");
+  }
+
+  return carparks.flatMap((carpark): RawAvailabilityRecord[] => {
     const carInfo = carpark.carpark_info[0];
 
     if (!carInfo) {
-      throw new Error(
-        `Missing carpark_info for carpark $(carpark.carpark_number)`,
-      );
+      return [];
     }
 
-    return {
-      carParkNo: carpark.carpark_number,
-      availableLots: Number(carInfo.lots_available),
-      totalLots: Number(carInfo.total_lots),
-      fetchedAt: new Date(carpark.update_datetime),
-    };
+    const availableLots = Number(carInfo.lots_available);
+
+    const totalLots = Number(carInfo.total_lots);
+
+    if (Number.isNaN(availableLots) || Number.isNaN(totalLots)) {
+      return [];
+    }
+
+    return [
+      {
+        carParkNo: carpark.carpark_number,
+        availableLots,
+        totalLots,
+        fetchedAt: new Date(carpark.update_datetime),
+      },
+    ];
   });
 }

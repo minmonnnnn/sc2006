@@ -16,7 +16,8 @@ describe("getAvailabilityByCarParkNo", () => {
     const result = getAvailabilityByCarParkNo("AK19");
 
     expect(result).not.toBeNull();
-    expect(result?.carParkNo).toBe("AK19");
+    expect(result?.availableLots).toBe(60);
+    expect(result?.totalLots).toBe(100);
     expect(result?.status).toBe("High");
   });
 

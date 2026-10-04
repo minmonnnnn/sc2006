@@ -20,12 +20,28 @@ describe("startAvailabilityPoller", () => {
     ]);
 
     startAvailabilityPoller();
+  });
 
-    // Move fake time forward by 1 minute
-    await vi.advanceTimersByTimeAsync(60 * 1000);
+  it("fetches availability immediately and every minute", async () => {
+    vi.useFakeTimers();
 
+    vi.mocked(fetchCarparkAvailability).mockResolvedValue([
+      {
+        carParkNo: "AK19",
+        availableLots: 50,
+        totalLots: 100,
+        fetchedAt: new Date(),
+      },
+    ]);
+
+    const stopPoller = startAvailabilityPoller();
+    await vi.runAllTicks();
     expect(fetchCarparkAvailability).toHaveBeenCalledTimes(1);
 
+    await vi.advanceTimersByTimeAsync(60 * 1000);
+    expect(fetchCarparkAvailability).toHaveBeenCalledTimes(2);
+
+    stopPoller();
     vi.useRealTimers();
   });
 });

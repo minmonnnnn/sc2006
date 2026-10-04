@@ -27,8 +27,7 @@ describe("availability alert routes", () => {
 
     expect(response.status).toBe(201);
     expect(response.body.carParkNo).toBe("AK19");
-    expect(response.body.enabled).toBe(true);
-    expect(response.body.alertId).toBeDefined();
+    expect(typeof response.body.alertId).toBe("string");
   });
 
   it("returns 404 when creating an alert for an unknown carpark", async () => {

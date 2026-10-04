@@ -1,8 +1,10 @@
+import type { AvailabilityStatus } from "./service.js";
+
 export interface CarparkFilterInput {
   carParkNo: string;
   hasEvCharging: boolean;
-  parkingCost: number;
-  availabilityStatus: "High" | "Moderate" | "Low" | "Unavailable";
+  parkingCost: number | null;
+  availabilityStatus: AvailabilityStatus;
   isSheltered: boolean;
 }
 
@@ -13,27 +15,34 @@ export interface CarparkFilters {
   shelteredOnly?: boolean;
 }
 
+const availabilityRank: Record<AvailabilityStatus, number> = {
+  Unavailable: 0,
+  Low: 1,
+  Moderate: 2,
+  High: 3,
+};
+
 export function filterCarparks(
   carparks: CarparkFilterInput[],
   filters: CarparkFilters,
 ): CarparkFilterInput[] {
-  const availabilityRank = {
-    Unavailable: 0,
-    Low: 1,
-    Moderate: 2,
-    High: 3,
-  };
-
   return carparks.filter((carpark) => {
     if (filters.evChargingOnly && !carpark.hasEvCharging) {
       return false;
     }
 
-    if (
-      filters.maxCost !== undefined &&
-      carpark.parkingCost > filters.maxCost
-    ) {
+    if (filters.shelteredOnly && !carpark.isSheltered) {
       return false;
+    }
+
+    if (filters.maxCost !== undefined) {
+      if (carpark.parkingCost === null) {
+        return false;
+      }
+
+      if (carpark.parkingCost > filters.maxCost) {
+        return false;
+      }
     }
 
     if (
@@ -41,10 +50,6 @@ export function filterCarparks(
       availabilityRank[carpark.availabilityStatus] <
         availabilityRank[filters.minAvailability]
     ) {
-      return false;
-    }
-
-    if (filters.shelteredOnly && !carpark.isSheltered) {
       return false;
     }
 

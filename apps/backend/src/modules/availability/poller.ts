@@ -2,19 +2,30 @@ import { fetchCarparkAvailability } from "./api.js";
 import { replaceAvailabilityCache } from "./cache.js";
 import { checkAvailabilityAlerts } from "./alerts.service.js";
 
-export function startAvailabilityPoller() {
-  const intervalMs = 60 * 1000;
+const POLL_INTERVAL_MS = 60 * 1000;
 
-  setInterval(async () => {
-    try {
-      const latestData = await fetchCarparkAvailability();
+async function refreshAvailability(): Promise<void> {
+  try {
+    const latestData = await fetchCarparkAvailability();
 
-      replaceAvailabilityCache(latestData);
-      checkAvailabilityAlerts();
+    replaceAvailabilityCache(latestData);
 
-      console.log(`Fetched ${latestData.length} carpark availability records`);
-    } catch (error) {
-      console.error("Failed to refresh carpark availability: ", error);
-    }
-  }, intervalMs);
+    checkAvailabilityAlerts();
+  } catch (error) {
+    console.error("Failed to refresh carpark availability:", error);
+  }
+}
+
+export function startAvailabilityPoller(): () => void {
+  // Fetch once immediately when backend starts
+  void refreshAvailability();
+
+  // Continue refreshing once per minute
+  const intervalId = setInterval(() => {
+    void refreshAvailability();
+  }, POLL_INTERVAL_MS);
+
+  return () => {
+    clearInterval(intervalId);
+  };
 }

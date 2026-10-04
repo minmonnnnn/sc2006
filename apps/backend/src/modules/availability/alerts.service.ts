@@ -1,5 +1,7 @@
 import type { AvailabilityStatus } from "./service.js";
+
 import { getAvailabilityByCarParkNo } from "./repository.js";
+
 import {
   getEnabledAlerts,
   updateAlertLastKnownStatus,
@@ -22,16 +24,21 @@ export function checkAvailabilityAlerts(): void {
       continue;
     }
 
+    const previousStatus = alert.lastKnownStatus;
+
     const changed = hasSignificantAvailabilityChange(
-      alert.lastKnownStatus,
+      previousStatus,
       availability.status,
     );
 
-    if (changed) {
-      updateAlertLastKnownStatus(alert.id, availability.status);
-      console.log(
-        `Availability alert: ${alert.carParkNo} changed from ${alert.lastKnownStatus} to ${availability.status}`,
-      );
+    if (!changed) {
+      continue;
     }
+
+    updateAlertLastKnownStatus(alert.id, availability.status);
+
+    console.log(
+      `Availability alert: ${alert.carParkNo} changed from ${previousStatus} to ${availability.status}`,
+    );
   }
 }
