@@ -74,3 +74,77 @@ it("returns all carparks when no filters are applied", () => {
 
   expect(result).toEqual(carparks);
 });
+
+describe("filter edge cases", () => {
+  it("combines all four filters using AND logic", () => {
+    const result = filterCarparks(carparks, {
+      evChargingOnly: true,
+      shelteredOnly: true,
+      maxCost: 1,
+      minAvailability: "Low",
+    });
+
+    expect(result.map((carpark) => carpark.carParkNo)).toEqual(["C1"]);
+  });
+
+  it("excludes unknown prices when a cost limit is applied", () => {
+    const unknownPriceCarpark = {
+      carParkNo: "D1",
+      hasEvCharging: false,
+      parkingCost: null,
+      availabilityStatus: "High" as const,
+      isSheltered: false,
+    };
+
+    expect(filterCarparks([unknownPriceCarpark], { maxCost: 2 })).toEqual([]);
+
+    expect(filterCarparks([unknownPriceCarpark], {})).toEqual([
+      unknownPriceCarpark,
+    ]);
+  });
+
+  it("supports a zero-cost filter", () => {
+    const freeCarpark = {
+      carParkNo: "FREE",
+      hasEvCharging: false,
+      parkingCost: 0,
+      availabilityStatus: "High" as const,
+      isSheltered: false,
+    };
+
+    const result = filterCarparks([...carparks, freeCarpark], { maxCost: 0 });
+
+    expect(result.map((carpark) => carpark.carParkNo)).toEqual(["FREE"]);
+  });
+
+  it("excludes unavailable carparks when minimum availability is Low", () => {
+    const unavailableCarpark = {
+      carParkNo: "FULL",
+      hasEvCharging: true,
+      parkingCost: 1,
+      availabilityStatus: "Unavailable" as const,
+      isSheltered: true,
+    };
+
+    const result = filterCarparks([...carparks, unavailableCarpark], {
+      minAvailability: "Low",
+    });
+
+    expect(result.map((carpark) => carpark.carParkNo)).toEqual([
+      "A1",
+      "B1",
+      "C1",
+    ]);
+  });
+
+  it("restores all results when filters are cleared", () => {
+    expect(filterCarparks(carparks, { evChargingOnly: true })).toHaveLength(2);
+
+    expect(
+      filterCarparks(carparks, {
+        evChargingOnly: false,
+        shelteredOnly: false,
+      }),
+    ).toEqual(carparks);
+  });
+});
