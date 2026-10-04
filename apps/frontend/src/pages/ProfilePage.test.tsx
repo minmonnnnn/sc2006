@@ -270,7 +270,7 @@ describe('ProfilePage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     deletion.resolve(new Response(null, { status: 503 }))
     await screen.findByRole('alert')
-    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()
+    await waitFor(() => {expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()})
     await user.tab({ shift: true })
     expect(screen.getByRole('dialog').querySelector('button[type="submit"]')).toHaveFocus()
   })
