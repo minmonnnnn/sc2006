@@ -73,10 +73,10 @@ describe("AvailabilityBadge", () => {
 
     const progress = screen.getByRole("progressbar", {
       name: "Available parking spaces",
-    }) as HTMLProgressElement;
+    });
 
-    expect(progress.value).toBe(60);
-    expect(progress.max).toBe(100);
+    expect(progress.getAttribute("aria-valuenow")).toBe("60");
+    expect(progress.getAttribute("aria-valuemax")).toBe("100");
   });
 
   it("handles zero capacity without an invalid percentage", () => {
@@ -91,8 +91,8 @@ describe("AvailabilityBadge", () => {
 
     const progress = screen.getByRole("progressbar", {
       name: "Available parking spaces",
-    }) as HTMLProgressElement;
+    });
 
-    expect(progress.value).toBe(0);
+    expect(progress.getAttribute("aria-valuenow")).toBe("0");
   });
 });

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
+import { Button, Chip, vars } from "../../../components";
 
 type AvailabilityFilter = "High" | "Moderate" | "Low";
 
@@ -13,71 +14,75 @@ interface CarparkFiltersProps {
   onChange: (filters: CarparkFilterValues) => void;
 }
 
+const fieldStyle: CSSProperties = {
+  padding: vars.space[2],
+  borderWidth: "thin",
+  borderStyle: "solid",
+  borderColor: vars.color.border,
+  borderRadius: vars.radius.sm,
+  backgroundColor: vars.color.background,
+  color: vars.color.textPrimary,
+  font: "inherit",
+  maxWidth: "100%",
+};
+
+const labelStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: vars.space[2],
+  color: vars.color.textPrimary,
+};
+
 export function CarparkFilters({ onChange }: CarparkFiltersProps) {
   const [filters, setFilters] = useState<CarparkFilterValues>({
     evChargingOnly: false,
     shelteredOnly: false,
   });
 
-  function updateFilters(newFilters: CarparkFilterValues) {
-    setFilters(newFilters);
-    onChange(newFilters);
+  function updateFilters(nextFilters: CarparkFilterValues) {
+    setFilters(nextFilters);
+    onChange(nextFilters);
   }
 
   return (
     <div
       style={{
         display: "flex",
-        gap: "10px",
+        gap: vars.space[3],
         alignItems: "center",
         flexWrap: "wrap",
+        fontFamily: vars.font.family,
+        fontSize: vars.fontSize.sm,
       }}
     >
-      <button
-        type="button"
-        aria-pressed={filters.evChargingOnly}
+      <Chip
+        selected={filters.evChargingOnly}
         onClick={() =>
           updateFilters({
             ...filters,
             evChargingOnly: !filters.evChargingOnly,
           })
         }
-        style={{
-          padding: "8px 14px",
-          borderRadius: "20px",
-          border: "1px solid #999",
-          backgroundColor: filters.evChargingOnly ? "#ddd" : "white",
-          color: "black",
-          fontWeight: filters.evChargingOnly ? "bold" : "normal",
-        }}
       >
         EV Charging
-      </button>
+      </Chip>
 
-      <button
-        type="button"
-        aria-pressed={filters.shelteredOnly}
+      <Chip
+        selected={filters.shelteredOnly}
         onClick={() =>
           updateFilters({
             ...filters,
             shelteredOnly: !filters.shelteredOnly,
           })
         }
-        style={{
-          padding: "8px 14px",
-          borderRadius: "20px",
-          border: "1px solid #999",
-          backgroundColor: filters.shelteredOnly ? "#ddd" : "white",
-          color: "black",
-          fontWeight: filters.shelteredOnly ? "bold" : "normal",
-        }}
       >
         Sheltered
-      </button>
+      </Chip>
 
-      <label>
-        Availability{" "}
+      <label style={labelStyle}>
+        Availability
         <select
+          style={fieldStyle}
           value={filters.minAvailability ?? ""}
           onChange={(event) => {
             const value = event.target.value;
@@ -105,13 +110,17 @@ export function CarparkFilters({ onChange }: CarparkFiltersProps) {
         </select>
       </label>
 
-      <label>
-        Max Cost{" "}
+      <label style={labelStyle}>
+        Max Cost
         <input
           type="number"
           min="0"
           step="0.1"
           value={filters.maxCost ?? ""}
+          style={{
+            ...fieldStyle,
+            width: `calc(${vars.space[8]} * 3)`,
+          }}
           onChange={(event) => {
             const value = event.target.value;
             const nextFilters = { ...filters };
@@ -130,11 +139,12 @@ export function CarparkFilters({ onChange }: CarparkFiltersProps) {
 
             updateFilters(nextFilters);
           }}
-          style={{ width: "80px" }}
         />
       </label>
 
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() =>
           updateFilters({
             evChargingOnly: false,
@@ -143,7 +153,7 @@ export function CarparkFilters({ onChange }: CarparkFiltersProps) {
         }
       >
         Clear Filters
-      </button>
+      </Button>
     </div>
   );
 }

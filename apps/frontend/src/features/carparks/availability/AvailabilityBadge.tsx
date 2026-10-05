@@ -1,3 +1,5 @@
+import { ProgressBar, vars } from "../../../components";
+
 interface AvailabilityBadgeProps {
   availableLots: number;
   totalLots: number;
@@ -12,23 +14,43 @@ export function AvailabilityBadge({
   isStale,
 }: AvailabilityBadgeProps) {
   const percentage =
-    totalLots > 0 ? Math.round((availableLots / totalLots) * 100) : 0;
+    totalLots > 0
+      ? Math.min(100, Math.max(0, (availableLots / totalLots) * 100))
+      : 0;
+
+  const tone =
+    status === "High"
+      ? "success"
+      : status === "Moderate"
+        ? "warning"
+        : "danger";
 
   return (
-    <div>
+    <div
+      style={{
+        display: "grid",
+        gap: vars.space[2],
+        color: vars.color.textPrimary,
+      }}
+    >
       <strong>{status}</strong>
 
       <div>
         {availableLots} / {totalLots} lots available
       </div>
 
-      <progress
-        aria-label="Available parking spaces"
-        max={100}
+      <ProgressBar
+        label="Available parking spaces"
         value={percentage}
+        max={100}
+        tone={tone}
       />
 
-      {isStale && <small>Availability data may be outdated</small>}
+      {isStale && (
+        <small style={{ color: vars.color.textSecondary }}>
+          Availability data may be outdated
+        </small>
+      )}
     </div>
   );
 }
