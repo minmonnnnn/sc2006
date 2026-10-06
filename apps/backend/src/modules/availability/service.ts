@@ -9,9 +9,9 @@ export interface AvailabilityInfo {
 }
 
 /**
- * High: at least 50% of lots available.
- * Moderate: at least 20%, but below 50%.
- * Low: above 0%, but below 20%.
+ * High: at least 30% of lots available.
+ * Moderate: at least 10%, but below 30%.
+ * Low: above 0%, but below 10%.
  * Unavailable: no available lots or non-positive capacity.
  */
 export function getAvailabilityStatus(
@@ -24,11 +24,11 @@ export function getAvailabilityStatus(
 
   const ratio = availableLots / totalLots;
 
-  if (ratio >= 0.5) {
+  if (ratio >= 0.3) {
     return "High";
   }
 
-  if (ratio >= 0.2) {
+  if (ratio >= 0.1) {
     return "Moderate";
   }
 

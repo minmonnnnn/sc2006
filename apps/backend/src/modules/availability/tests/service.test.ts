@@ -9,10 +9,10 @@ describe("getAvailabilityStatus", () => {
   it.each([
     [0, 100, "Unavailable"],
     [1, 100, "Low"],
-    [19, 100, "Low"],
-    [20, 100, "Moderate"],
-    [49, 100, "Moderate"],
-    [50, 100, "High"],
+    [9, 100, "Low"],
+    [10, 100, "Moderate"],
+    [29, 100, "Moderate"],
+    [30, 100, "High"],
     [100, 100, "High"],
     [0, 0, "Unavailable"],
     [10, 0, "Unavailable"],
@@ -89,8 +89,8 @@ describe("buildAvailabilityInfo", () => {
   it("marks old data stale while preserving its lot counts", () => {
     const fetchedAt = new Date("2026-10-04T00:06:00Z");
 
-    expect(buildAvailabilityInfo(30, 100, fetchedAt)).toEqual({
-      availableLots: 30,
+    expect(buildAvailabilityInfo(20, 100, fetchedAt)).toEqual({
+      availableLots: 20,
       totalLots: 100,
       status: "Moderate",
       lastUpdated: fetchedAt.toISOString(),
