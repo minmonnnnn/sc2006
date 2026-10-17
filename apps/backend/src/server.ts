@@ -16,6 +16,7 @@ import { createSearchRouter } from "./modules/search/search.routes.js";
 import weatherRouter from "./modules/weather/weather.routes.js";
 import { createAvailabilityRepository } from "./modules/availability/repository.js";
 import { createAvailabilityRouter } from "./modules/availability/routes.js";
+import { createAlertRepository } from "./modules/availability/alerts.repository.js";
 import { createAlertRouter } from "./modules/availability/alerts.routes.js";
 import { startAvailabilityPoller } from "./modules/availability/poller.js";
 
@@ -26,6 +27,7 @@ const favouritesGateway = createSupabaseFavouritesGateway(clients.adminClient);
 const availabilityRepository = createAvailabilityRepository(
   clients.adminClient,
 );
+const alertRepository = createAlertRepository(clients.adminClient);
 
 const server = createApp({
   frontendOrigin: env.frontendOrigin,
@@ -39,16 +41,16 @@ const server = createApp({
   search: createSearchRouter(clients.adminClient),
   weather: weatherRouter,
   availability: createAvailabilityRouter(availabilityRepository),
-  alerts: createAlertRouter(authGateway.verifyToken),
+  alerts: createAlertRouter({
+    verifyToken: authGateway.verifyToken,
+    alerts: alertRepository,
+    availability: availabilityRepository,
+  }),
 }).listen(env.port, () => {
   console.log(`Backend listening on http://localhost:${env.port}`);
 });
 
-const stopAvailabilityPoller = startAvailabilityPoller(
-  undefined,
-  undefined,
-  availabilityRepository,
-);
+const stopAvailabilityPoller = startAvailabilityPoller(availabilityRepository);
 
 function shutdown(): void {
   stopAvailabilityPoller();

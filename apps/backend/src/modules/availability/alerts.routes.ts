@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { createAlert, setAlertEnabled } from "./alerts.repository.js";
-import { getAvailabilityByCarParkNo } from "./repository.js";
+import { ApiException } from "../../lib/errors/index.js";
+import type { AlertRepository } from "./alerts.repository.js";
+import type { AvailabilityRepository } from "./repository.js";
 
 export type VerifyAlertToken = (
   token: string,
@@ -10,7 +11,25 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function createAlertRouter(verifyToken: VerifyAlertToken): Router {
+export interface AlertRouterDependencies {
+  verifyToken: VerifyAlertToken;
+  alerts: Pick<AlertRepository, "createAlert" | "setAlertEnabled">;
+  availability: Pick<AvailabilityRepository, "getAvailabilityByCarParkNo">;
+}
+
+const MAX_ALERT_ID = 2_147_483_647;
+
+function unauthorized(): ApiException {
+  return new ApiException(
+    401,
+    "UNAUTHORIZED",
+    "Sign in to manage availability alerts",
+  );
+}
+
+export function createAlertRouter(
+  dependencies: AlertRouterDependencies,
+): Router {
   const router: Router = Router();
 
   router.use(async (req, res, next) => {
@@ -22,51 +41,41 @@ export function createAlertRouter(verifyToken: VerifyAlertToken): Router {
     const match = /^Bearer ([^\s,]+)$/i.exec(req.headers.authorization ?? "");
 
     if (authorizationCount !== 1 || !match) {
-      return res.status(401).json({
-        error: {
-          code: "UNAUTHORIZED",
-          message: "Sign in to manage availability alerts",
-        },
-      });
+      next(unauthorized());
+      return;
     }
 
     let user: { userId: string } | null;
 
     try {
-      user = await verifyToken(match[1]!);
+      user = await dependencies.verifyToken(match[1]!);
     } catch {
-      return res.status(503).json({
-        error: {
-          code: "EXTERNAL_SERVICE_UNAVAILABLE",
-          message: "Authentication service unavailable",
-        },
-      });
+      next(
+        new ApiException(
+          503,
+          "EXTERNAL_SERVICE_UNAVAILABLE",
+          "Authentication service unavailable",
+        ),
+      );
+      return;
     }
 
-    if (!user || !user.userId) {
-      return res.status(401).json({
-        error: {
-          code: "UNAUTHORIZED",
-          message: "Sign in to manage availability alerts",
-        },
-      });
+    if (!user || typeof user.userId !== "string" || !user.userId) {
+      next(unauthorized());
+      return;
     }
 
     res.locals.alertUserId = user.userId;
     next();
   });
 
-  router.post("/", (req, res) => {
+  router.post("/", async (req, res, next) => {
     const userId: unknown = res.locals.alertUserId;
     const body: unknown = req.body;
 
     if (typeof userId !== "string") {
-      return res.status(401).json({
-        error: {
-          code: "UNAUTHORIZED",
-          message: "Sign in to manage availability alerts",
-        },
-      });
+      next(unauthorized());
+      return;
     }
 
     if (
@@ -74,81 +83,105 @@ export function createAlertRouter(verifyToken: VerifyAlertToken): Router {
       typeof body.carParkNo !== "string" ||
       body.carParkNo.trim() === ""
     ) {
-      return res.status(400).json({
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "carParkNo must be a non-empty string",
-        },
-      });
+      next(
+        new ApiException(
+          400,
+          "VALIDATION_ERROR",
+          "carParkNo must be a non-empty string",
+        ),
+      );
+      return;
     }
 
     const carParkNo = body.carParkNo.trim();
-    const availability = getAvailabilityByCarParkNo(carParkNo);
 
-    if (!availability) {
-      return res.status(404).json({
-        error: {
-          code: "NOT_FOUND",
-          message: "Carpark availability not found",
-        },
+    try {
+      const availability =
+        await dependencies.availability.getAvailabilityByCarParkNo(carParkNo);
+
+      if (!availability) {
+        next(
+          new ApiException(404, "NOT_FOUND", "Carpark availability not found"),
+        );
+        return;
+      }
+
+      const alert = await dependencies.alerts.createAlert(
+        userId,
+        carParkNo,
+        availability.status,
+      );
+
+      res.status(201).json({
+        alertId: String(alert.id),
+        carParkNo: alert.carParkNo,
+        enabled: alert.enabled,
       });
+    } catch {
+      next(
+        new ApiException(
+          503,
+          "EXTERNAL_SERVICE_UNAVAILABLE",
+          "Alerts service unavailable",
+        ),
+      );
     }
-
-    const alert = createAlert(userId, carParkNo, availability.status);
-
-    return res.status(201).json({
-      alertId: String(alert.id),
-      carParkNo: alert.carParkNo,
-      enabled: alert.enabled,
-    });
   });
 
-  router.patch("/:id", (req, res) => {
+  router.patch("/:id", async (req, res, next) => {
     const userId: unknown = res.locals.alertUserId;
     const rawId = req.params.id;
     const id = Number(rawId);
     const body: unknown = req.body;
 
     if (typeof userId !== "string") {
-      return res.status(401).json({
-        error: {
-          code: "UNAUTHORIZED",
-          message: "Sign in to manage availability alerts",
-        },
-      });
+      next(unauthorized());
+      return;
     }
 
     if (
       !/^[1-9]\d*$/.test(rawId) ||
       !Number.isSafeInteger(id) ||
+      id > MAX_ALERT_ID ||
       !isObject(body) ||
       typeof body.enabled !== "boolean"
     ) {
-      return res.status(400).json({
-        error: {
-          code: "VALIDATION_ERROR",
-          message:
-            "A positive integer alert id and boolean enabled are required",
-        },
-      });
+      next(
+        new ApiException(
+          400,
+          "VALIDATION_ERROR",
+          "A valid positive integer alert id and boolean enabled are required",
+        ),
+      );
+      return;
     }
 
-    const alert = setAlertEnabled(id, userId, body.enabled);
+    try {
+      const alert = await dependencies.alerts.setAlertEnabled(
+        id,
+        userId,
+        body.enabled,
+      );
 
-    if (!alert) {
-      return res.status(404).json({
-        error: {
-          code: "NOT_FOUND",
-          message: "Alert not found",
-        },
+      if (!alert) {
+        next(new ApiException(404, "NOT_FOUND", "Alert not found"));
+        return;
+      }
+
+      res.status(200).json({
+        alertId: String(alert.id),
+        carParkNo: alert.carParkNo,
+        enabled: alert.enabled,
       });
+    } catch {
+      next(
+        new ApiException(
+          503,
+          "EXTERNAL_SERVICE_UNAVAILABLE",
+          "Alerts service unavailable",
+        ),
+      );
     }
-
-    return res.status(200).json({
-      alertId: String(alert.id),
-      carParkNo: alert.carParkNo,
-      enabled: alert.enabled,
-    });
   });
 
   return router;
