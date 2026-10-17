@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { vars } from "../../../components";
 import { AvailabilityAlertToggle } from "./AvailabilityAlertToggle";
 import { createAvailabilityAlert, updateAvailabilityAlert } from "./api";
+import { AvailabilityAlertMonitor } from "./AvailabilityAlertMonitor";
 
 interface AvailabilityAlertControlProps {
   carParkNo: string;
@@ -120,7 +121,7 @@ function SubscriptionControl({
       <fieldset
         disabled={pending}
         style={{
-          border: 'none',
+          border: "none",
           padding: 0,
           margin: 0,
         }}
@@ -130,8 +131,8 @@ function SubscriptionControl({
             fontSize: vars.fontSize.xs,
             fontWeight: vars.fontWeight.semibold,
             color: vars.color.textMuted,
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
             marginBottom: vars.space[2],
           }}
         >
@@ -145,6 +146,8 @@ function SubscriptionControl({
           }}
         />
       </fieldset>
+
+      {enabled && <AvailabilityAlertMonitor carParkNo={carParkNo} />}
 
       {pending && (
         <p
